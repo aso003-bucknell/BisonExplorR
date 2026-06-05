@@ -1,0 +1,12 @@
+Package: BisonExplorR
+Title: Interactive R Tutorials for Introductory Biology at Bucknell University
+Version: 0.1.0
+Authors@R: 
+   person("Alexandra", "Orr", email = "aso003.email@bucknell.edu", role = c("aut", "cre"))
+Description: A collection of interactive learnr tutorials supporting the BIOL 203/204 
+    Integrated Concepts in Biology laboratory curriculum. Covers data organization, 
+    visualization, and statistical analysis using biological datasets.
+License: CC BY 4.0
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 8.0.0
