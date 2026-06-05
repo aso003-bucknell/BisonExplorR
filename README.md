@@ -1,6 +1,6 @@
 
 # BisonExplorR
-# BisonExplorR <img src="man/figures/logo.png" align="right" height="122" alt="" />
+# BisonExplorR <img src="man/figures/logo.png" align="right" height="124" alt="" />
 
 <!-- badges: start -->
 <!-- badges: end -->
