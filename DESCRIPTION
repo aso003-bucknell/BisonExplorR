@@ -34,3 +34,6 @@ Imports:
 Suggests:
     rmarkdown,
     rstudioapi
+Remotes:
+    rstudio/gradethis
+VignetteBuilder: knitr
