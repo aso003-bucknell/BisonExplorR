@@ -3,7 +3,7 @@ title: "Module 8: ANCOVA — Adding a Group to a Regression"
 output:
   learnr::tutorial:
     progressive: true
-    allow_skip: true
+    allow_skip: false
 runtime: shiny_prerendered
 description: >
   Take the regression you fitted in Module 6 and add a grouping factor to it.

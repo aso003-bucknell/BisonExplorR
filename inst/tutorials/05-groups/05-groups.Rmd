@@ -3,7 +3,7 @@ title: "Module 5: Comparing Groups — t-tests and ANOVA"
 output:
   learnr::tutorial:
     progressive: true
-    allow_skip: true
+    allow_skip: false
 runtime: shiny_prerendered
 description: >
   Ask whether two or more groups differ. Run a t-test and a one-way ANOVA,

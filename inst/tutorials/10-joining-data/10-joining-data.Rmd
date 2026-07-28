@@ -3,7 +3,7 @@ title: "Module 10: Joining Data — Combining Tables"
 output:
   learnr::tutorial:
     progressive: true
-    allow_skip: true
+    allow_skip: false
 runtime: shiny_prerendered
 description: >
   Real data often arrives in more than one table. Learn the two ways to combine

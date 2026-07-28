@@ -3,7 +3,7 @@ title: "Module 6: Linear Regression — Fitting a Line"
 output:
   learnr::tutorial:
     progressive: true
-    allow_skip: true
+    allow_skip: false
 runtime: shiny_prerendered
 description: >
   When your predictor is a measured number rather than a group, you fit a line.
