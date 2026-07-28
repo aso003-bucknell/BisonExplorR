@@ -1,0 +1,84 @@
+url: https://aso003-bucknell.github.io/BisonExplorR
+
+template:
+  bootstrap: 5
+  bslib:
+    # ---------------------------------------------------------------------
+    # Palette sampled from Logo_final.png on 2026-07-28, then split into
+    # BRAND colours (what the logo uses) and FUNCTIONAL colours (what text
+    # and links use). They are not the same, and the reason is contrast:
+    #
+    #   #F1781A on the logo's navy  = 6.30:1  ✅ AA
+    #   #F1781A on white            = 2.82:1  ❌ fails even the 3:1 UI floor
+    #
+    # The logo's orange is legible because it always sits on navy. As a link
+    # colour on a white page it is not. So the site uses a darkened version
+    # of the SAME HUE for anything readable, and reserves the true brand
+    # orange for the logo and for accents that sit on navy.
+    # ---------------------------------------------------------------------
+    primary: "#001930"    # navy — sampled from the logo (17.77:1 on white)
+    secondary: "#B55A14"  # link-safe orange, logo hue darkened (4.73:1 on white)
+    base_font: {google: "Source Sans 3"}
+    heading_font: {google: "Source Sans 3"}
+    code_font: {google: "Source Code Pro"}
+
+home:
+  title: Interactive R tutorials for introductory biology
+  description: >
+    learnr tutorials, in-lab scripts, and instructor grading tools for the
+    BIOL 203/204 laboratory sequence at Bucknell University.
+
+navbar:
+  structure:
+    left:  [students, instructors, reference, articles, news]
+    right: [search, github]
+  components:
+    students:
+      text: For students
+      href: articles/students.html
+    instructors:
+      text: For instructors
+      href: articles/instructors.html
+
+reference:
+- title: For students
+  desc: >
+    The three functions a student needs. Everything else on this page is
+    instructor-facing.
+  contents:
+  - launch_graded_tutorial
+  - get_lab
+  # ⚠️ get_practice_exam has no R/ source file and no NAMESPACE export yet, so
+  # pkgdown ERRORS here rather than warning. Uncomment once document() has
+  # generated man/get_practice_exam.Rd.
+  # - get_practice_exam
+
+- title: For instructors
+  desc: Grading and course administration.
+  contents:
+  - grade_module
+
+- title: The Coach
+  desc: >
+    Socratic hint UI embedded in tutorials. These are called from tutorial
+    `.Rmd` files, not from the console. The Coach requires a server-side
+    proxy; without one it falls back to static offline nudges.
+  contents:
+  - coach_ui
+  - coach_server
+
+articles:
+- title: Guides
+  navbar: ~
+  contents:
+  - students
+  - instructors
+
+authors:
+  Alexandra Orr:
+    href: https://www.bucknell.edu
+
+footer:
+  structure:
+    left: developed_by
+    right: built_with

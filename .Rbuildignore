@@ -1,4 +1,75 @@
-^BisonExplorR\.Rproj$
+# .Rbuildignore — BisonExplorR
+#
+# Patterns are PERL-style regular expressions matched against paths relative to
+# the package root, and they are NOT anchored automatically. Always write
+# ^name$ for a top-level file or folder: a bare `docs` would also match
+# `inst/tutorials/docs-demo`, and a bare `exams` would match anything with
+# "exams" in the path.
+#
+# THE TEST FOR THIS FILE: if a student seeing it via system.file() would be a
+# problem, it does not belong in the installed package. Everything under inst/
+# installs and is reachable. This file is the only thing standing between the
+# repo and the student-inspectable package.
+#
+# ⚠️ .Rbuildignore controls what ships in the BUILT PACKAGE. It has no effect
+# on what is visible in a public GitHub repository. If the repo is public,
+# exams/ and coach-endpoint/ are public regardless of the lines below.
+
+# --- Never ship: instructor-controlled and secret-adjacent -------------------
+# Real exams, answer keys, and their CSVs.
+^exams$
+# The Coach proxy. plumber.R BUILDS THE COACH'S SYSTEM PROMPT, so shipping it
+# would hand students the exact Socratic constraints and the phrasing that gets
+# around them. exercise_registry.R travels with it.
+^coach-endpoint$
+# Probes, preflight scripts, and state-probe .Rmd files. Anything placed in
+# inst/tutorials/ appears in students' Tutorial pane; dev/ is where those live
+# instead.
+^dev$
+
+# --- Never ship: environment and credentials --------------------------------
+# The graded-mode flag belongs in the DEPLOYED APP BUNDLE only. If a .Renviron
+# setting BISONEXPLORR_GRADED=true reaches the package, every practice copy
+# starts logging.
+^\.Renviron$
+^\.Renviron\..*$
+^.*\.Rprofile$
+
+# --- pkgdown -----------------------------------------------------------------
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+
+# --- Git, CI, and editor cruft ----------------------------------------------
+^\.github$
+^\.git$
+^\.gitignore$
+^\.gitattributes$
+^\.travis\.yml$
+^codecov\.yml$
+^appveyor\.yml$
+
+# --- RStudio / R session artefacts ------------------------------------------
+^.*\.Rproj$
 ^\.Rproj\.user$
-^\.positai$
-^\.claude$
+^\.Rhistory$
+^\.RData$
+^\.Ruserdata$
+^\.DS_Store$
+^.*desktop\.ini$
+
+# --- Project bookkeeping (useful in the repo, meaningless in the package) ----
+^BisonExplorR_project_seed\.md$
+^DATASET_REGISTRY\.md$
+^PROJECT_SYNC.*\.md$
+^.*_RUNBOOK\.md$
+^.*checklist.*\.md$
+^COACH_INTEGRATION\.md$
+^COACH_PILOT_README\.md$
+^tutorial_inlab_audit\.md$
+
+# --- Deliberately NOT ignored ------------------------------------------------
+# README.md   -> ships, and is the pkgdown home page
+# NEWS.md     -> ships, and is the pkgdown changelog
+# LICENSE     -> required
+# inst/       -> tutorials, labs, extdata, practice-exams all ship BY DESIGN

@@ -1,0 +1,120 @@
+---
+title: "State Probe — what does get_tutorial_state() actually return?"
+output: learnr::tutorial
+runtime: shiny_prerendered
+description: >
+  Throwaway diagnostic. Answers the one question blocking the Module 5
+  pilot: which field of get_tutorial_state() holds the student's
+  submitted code. Delete after running.
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(gradethis)
+gradethis::gradethis_setup()
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Why this exists
+
+`coach_server()` reads the student's submission out of
+`get_tutorial_state("q1")` and forwards it to the coach. **If the field name
+is wrong, nothing errors** — the coach just receives an empty string and
+starts giving generic advice on every attempt, which looks like a bad prompt
+rather than a bad field name.
+
+The seed has assumed `$answer` without ever confirming it against the
+installed learnr. This tutorial confirms it.
+
+**How to use:** render this file in Posit Cloud, type anything into the box
+below, press **Submit Answer**, then read the dump. Note which field holds
+your code and record it in the seed.
+
+## Step 1 — submit something
+
+Type any code at all. It does not need to be correct or even valid.
+
+```{r q1, exercise=TRUE}
+t.test(co2_drawdown_ppm ~ species, data = algae)
+```
+
+```{r q1-check}
+grade_this({
+  pass("Submitted. Now read the dump below.")
+})
+```
+
+## Step 2 — read the dump
+
+```{r probe-ui, echo=FALSE}
+shiny::actionButton("refresh", "Refresh dump", class = "btn-primary")
+shiny::tags$hr()
+shiny::verbatimTextOutput("state_dump")
+```
+
+```{r probe-server, context="server"}
+output$state_dump <- shiny::renderPrint({
+  input$refresh
+  st <- tryCatch(learnr::get_tutorial_state("q1"), error = function(e) e)
+
+  if (inherits(st, "error")) {
+    cat("get_tutorial_state('q1') ERRORED:\n"); print(st$message)
+    cat("\n-> The function may be namespaced differently in this learnr version.\n")
+    cat("   Try: ls(getNamespace('learnr')) and look for a state accessor.\n")
+    return(invisible(NULL))
+  }
+
+  if (is.null(st)) {
+    cat("get_tutorial_state('q1') returned NULL.\n")
+    cat("-> Either nothing has been submitted yet, or state is keyed by\n")
+    cat("   something other than the raw chunk label. Submit above first;\n")
+    cat("   if it is still NULL, see the full-state dump at the bottom.\n")
+    return(invisible(NULL))
+  }
+
+  cat("learnr version:", as.character(utils::packageVersion("learnr")), "\n\n")
+  cat("class(st):", paste(class(st), collapse = ", "), "\n")
+  cat("names(st):", paste(names(st), collapse = ", "), "\n\n")
+
+  cat("---- WHICH FIELD HOLDS THE SUBMITTED CODE? ----\n")
+  for (nm in names(st)) {
+    v <- st[[nm]]
+    if (is.character(v) && length(v) == 1 && nchar(v) > 0) {
+      cat(sprintf("  $%-14s <chr> %s\n", nm,
+                  substr(gsub("\n", " ", v), 1, 70)))
+    } else {
+      cat(sprintf("  $%-14s <%s, length %d>\n", nm,
+                  paste(class(v), collapse = "/"), length(v)))
+    }
+  }
+
+  cat("\n---- CANDIDATE CHECK ----\n")
+  for (cand in c("answer", "code", "user_code", "submission", "value", "input")) {
+    hit <- cand %in% names(st)
+    cat(sprintf("  $%-11s %s\n", cand,
+                if (hit) "PRESENT  <-- candidate" else "absent"))
+  }
+
+  cat("\n---- FULL STRUCTURE ----\n")
+  utils::str(st, max.level = 2)
+
+  cat("\n---- ALL EXERCISE STATE (keys seen by learnr) ----\n")
+  allst <- tryCatch(learnr::get_tutorial_state(), error = function(e) NULL)
+  if (is.null(allst)) cat("  (unavailable)\n") else {
+    cat("  keys:", paste(names(allst), collapse = ", "), "\n")
+  }
+})
+```
+
+## Step 3 — record the answer
+
+Whichever field above holds your submitted code is the one
+`coach_server()` must read.
+
+- If it is **`$answer`** — the current `coach_server()` is correct, no change needed.
+- If it is anything else — update the extraction in `coach_module.R` and note
+  the field name and the learnr version in the seed.
+
+Also record the **learnr version** printed at the top of the dump. A future
+Posit Cloud image bump can change this field, and this is the only thing that
+makes that failure visible rather than silent.

@@ -1,0 +1,451 @@
+---
+title: "Module 5: Comparing Groups — t-tests and ANOVA"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: >
+  Ask whether two or more groups differ. Run a t-test and a one-way ANOVA,
+  use a post-hoc test to see which groups differ, and show the comparison.
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(gradethis)
+library(httr)
+library(ggplot2)
+library(shiny)
+library(BisonExplorR)   # coach_ui() / coach_server()
+gradethis::gradethis_setup()
+tutorial_options(
+  exercise.checker = gradethis::grade_learnr,
+  exercise.completion = TRUE
+)
+knitr::opts_chunk$set(echo = FALSE)
+
+`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
+
+# Resolve the student ID no matter which session scope a handler receives.
+# VERIFIED 2026-07-25 (learnr 0.11.6): question() blocks are Shiny MODULES, so
+# a question_submission handler gets a NAMESPACED session whose input$sid is
+# EMPTY. The ID lives on the root session. This fails silently -- rows land in
+# the sheet looking well-formed but unattributable, grade_module() drops them,
+# and the student loses that score with no warning anywhere. Do not "simplify"
+# this back to session$input$sid.
+bx_get_sid <- function(session) {
+  usable <- function(x) !is.null(x) && length(x) > 0 && nzchar(as.character(x)[1])
+  sid <- tryCatch(session$rootScope()$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$userData$bx_sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  NULL   # log_attempt()'s %||% turns this into "unknown"
+}
+
+# Is this the GRADED deployment or a practice copy?
+# Set BISONEXPLORR_GRADED=true in the deployed app's .Renviron (or set the
+# option in its startup). Practice copies launched with run_tutorial() never
+# see it, so they default to FALSE.
+#
+# WHY THE PRACTICE BRANCH SHOWS A VISIBLE BANNER RATHER THAN NOTHING: if this
+# flag is ever missing on a deployed graded app, the ID box disappears and
+# nothing logs -- every student silently scores zero. A banner makes a
+# misconfigured deploy announce itself on the first screen instead of three
+# weeks later in the response sheet.
+bx_is_graded <- function() {
+  isTRUE(getOption(
+    "BisonExplorR.graded",
+    identical(tolower(Sys.getenv("BISONEXPLORR_GRADED")), "true")
+  ))
+}
+
+log_attempt <- function(student_id, exercise_id, correct) {
+  # Practice copies do not log. Without this, practice attempts POST with
+  # student_id = "unknown" and fill the response sheet with orphan rows
+  # that look like a bug in grade_module().
+  if (!bx_is_graded()) return(invisible(NULL))
+
+  tryCatch({
+    httr::POST(
+      url = "https://docs.google.com/forms/d/e/1FAIpQLSfmm3cUcoaWWYBb0zk7rbowSpgUL13nQc-Dxn7K8zQ30GdykA/formResponse",
+      body = list(
+        "entry.1413675438" = as.character(Sys.time()),
+        "entry.1257984687" = as.character(student_id %||% "unknown"),
+        "entry.1315894547" = "module5",
+        "entry.1172625272" = as.character(exercise_id %||% "unknown"),
+        "entry.1835356043" = as.character(correct %||% "NA")
+      ),
+      encode = "form"
+    )
+  }, error = function(e) message("Logging failed: ", e$message))
+}
+
+# Shared data — must live in the setup chunk (learnr sandboxes each exercise).
+# Read from the packaged CSV rather than generated with set.seed(): the numbers
+# quoted in the pass messages below were verified against THIS file, so a change
+# in R's RNG cannot silently invalidate them.
+algae <- read.csv(
+  system.file("extdata", "algae_beads.csv", package = "BisonExplorR"),
+  stringsAsFactors = FALSE
+)
+
+# House style: factors are pre-set here, never with inline as.factor().
+algae$species        <- factor(algae$species)
+algae$nutrient_level <- factor(algae$nutrient_level,
+                               levels = c("low", "medium", "high"))
+```
+
+```{r event-setup, context="server-start"}
+# Code exercises. Correctness lives on data$feedback$correct here.
+event_register_handler("exercise_result", function(session, event, data) {
+  log_attempt(
+    student_id  = bx_get_sid(session),
+    exercise_id = data$label,
+    correct     = data$feedback$correct
+  )
+})
+
+# Multiple-choice items. This is what makes mc1-mc4 gradeable: without it
+# question() blocks emit question_submission, nothing logs them, and
+# grade_module() has no rows to score against.
+#
+# NOTE: the payload shape differs from exercise_result -- correctness is on
+# data$correct, NOT data$feedback$correct. That field name has not been
+# verified against the installed learnr, and a wrong guess fails SILENTLY
+# (every MC logs NA forever), so both are tried and the probe confirms it.
+event_register_handler("question_submission", function(session, event, data) {
+  correct_flag <- data$correct
+  if (is.null(correct_flag) || length(correct_flag) == 0) {
+    correct_flag <- data$feedback$correct
+  }
+  log_attempt(
+    student_id  = bx_get_sid(session),
+    exercise_id = data$label,
+    correct     = correct_flag
+  )
+})
+```
+
+```{r coach-server, context="server"}
+# Coached: q1 (first stats code they write) and q3 (composing two functions).
+# q2 mirrors q1's pattern and q4 is a single-blank fill — the inline hint is
+# enough there, and a coach would only add noise and API cost.
+BisonExplorR::coach_server("coach_q1", shiny::reactive(learnr::get_tutorial_state("q1")), "module5-q1")
+BisonExplorR::coach_server("coach_q3", shiny::reactive(learnr::get_tutorial_state("q3")), "module5-q3")
+```
+
+
+## Before you start
+
+```{r student-id, echo=FALSE}
+uiOutput("sid_ui")
+```
+
+```{r sid-server, context="server"}
+# The ID box exists ONLY in the graded deployment. See bx_is_graded() in setup.
+output$sid_ui <- renderUI({
+  if (!bx_is_graded()) {
+    return(shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #C05621; background:#FDF6EC;"),
+      shiny::strong("Practice mode."),
+      " Nothing here is recorded and this copy does not count for credit.",
+      " To do this module for credit, run ",
+      shiny::tags$code('launch_graded_tutorial("module5")'),
+      " instead."
+    ))
+  }
+  shiny::tagList(
+    shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #1F3864; background:#F2F4F7;"),
+      shiny::strong("Graded copy."),
+      " Your work on this module is recorded, so enter your student ID before",
+      " you begin. Use the same ID every time \u2014 a different ID reads as a",
+      " different student and your work will not be combined."
+    ),
+    shiny::textInput("sid",
+      "Student ID (the same one you used in Module 1):", value = ""),
+    shiny::div(id = "sid_warn",
+      style = "color:#C05621; font-weight:600; margin:-6px 0 8px 0;",
+      "Enter your ID to continue."),
+    # Client-side gate on the section's Continue button. This prevents the
+    # ACCIDENTAL case (a student who forgets), not a determined one -- anyone
+    # with devtools can re-enable the button. The real protection against
+    # unattributed rows is that grade_module() drops blank IDs.
+    shiny::tags$script(shiny::HTML("
+      (function () {
+        function apply() {
+          var sid = document.getElementById('sid');
+          if (!sid) return;
+          var sec = sid.closest('.section');
+          if (!sec) return;
+          var btns = sec.querySelectorAll('.topicActions button, .continueButton');
+          var ok = sid.value.trim().length > 0;
+          btns.forEach(function (b) {
+            b.disabled = !ok;
+            b.style.opacity = ok ? '' : '0.45';
+            b.style.cursor  = ok ? '' : 'not-allowed';
+          });
+          var w = document.getElementById('sid_warn');
+          if (w) w.style.display = ok ? 'none' : 'block';
+        }
+        document.addEventListener('input', function (e) {
+          if (e.target && e.target.id === 'sid') apply();
+        });
+        // learnr renders sections progressively, so the Continue button may not
+        // exist yet when this script first runs.
+        new MutationObserver(apply)
+          .observe(document.body, { childList: true, subtree: true });
+        apply();
+      })();
+    "))
+  )
+})
+
+# Cache the ID on userData as a second, independent path to it. bx_get_sid()
+# checks rootScope() first and falls back to this.
+shiny::observeEvent(input$sid, {
+  if (!is.null(input$sid) && nzchar(input$sid)) {
+    session$userData$bx_sid <- input$sid
+  }
+}, ignoreInit = TRUE)
+```
+
+
+## The question this module answers
+
+You have a response you measured and groups you want to compare. *Do the groups
+differ by more than chance?* That is what a t-test and an ANOVA are for — the
+only difference is **how many groups**.
+
+Everything here uses **`algae`**: 60 vials of alginate-encapsulated algae beads.
+Each vial holds one of two species, was grown at one of three nutrient levels,
+and had its **CO2 drawdown** measured — how much CO2 the beads pulled out of the
+water. More drawdown means more photosynthesis.
+
+```{r peek, exercise=TRUE}
+head(algae)
+```
+
+This is the same response variable you will meet again in Module 6
+(`co2_drawdown_ppm`). That is deliberate: one measurement, asked three different
+questions. What changes between modules is not the biology but the **kind of
+predictor** you put on the right of the tilde.
+
+### The map: which test, when
+
+Keep this table in view — it is the same in every statistics module. The last
+column tells you where each test is taught.
+
+| Biological question | Predictor(s) | Test | R function | Module |
+|---|---|---|---|---|
+| Do **two** groups differ? | one factor, 2 levels | t-test | `t.test()` | 5 |
+| Do **three or more** groups differ? | one factor, 3+ levels | one-way ANOVA | `aov()` + `summary()` | 5 |
+| Does a **continuous** variable predict the response? | one continuous | linear regression | `lm()` + `summary()` | 6 |
+| Do groups differ across **two factors**? | two factors | two-way ANOVA | `aov()` + `summary()` | 7 |
+| Do groups differ **after controlling for** a continuous variable? | factor + covariate | ANCOVA | `aov()` + `summary()` | 8 |
+
+**Where you are:** Module 5 — one grouping factor, two or more groups.
+
+### Pick the test
+
+```{r mc1, echo=FALSE}
+question(
+  "You want to know whether CO2 drawdown differs between the two algal species. Which test?",
+  answer("t-test", correct = TRUE, message = "Exactly two groups — a t-test."),
+  answer("One-way ANOVA", message = "ANOVA is for three or more groups. Species has two."),
+  answer("TukeyHSD", message = "Tukey is a follow-up to ANOVA, not a stand-alone two-group test."),
+  allow_retry = TRUE
+)
+```
+
+## Two groups: the t-test
+
+The t-test formula reads `response ~ group`.
+
+### Exercise q1
+
+Run a t-test comparing `co2_drawdown_ppm` between the two levels of `species`.
+
+```{r q1, exercise=TRUE}
+t.test(___ ~ ___, data = algae)
+```
+
+```{r q1-hint}
+# Response on the left of ~, grouping factor on the right.
+t.test(co2_drawdown_ppm ~ species, data = algae)
+```
+
+```{r q1-solution}
+t.test(co2_drawdown_ppm ~ species, data = algae)
+```
+
+```{r q1-check}
+grade_this({
+  if (inherits(.result, "htest") && grepl("species", .result$data.name)) {
+    pass("Look at the p-value, then the group means at the bottom of the output.")
+  }
+  fail("Not quite. Use t.test(co2_drawdown_ppm ~ species, data = algae).")
+})
+```
+
+```{r coach-ui-q1, echo=FALSE}
+BisonExplorR::coach_ui("coach_q1", "Stuck? Ask the Coach")
+```
+
+### Read it
+
+The output gave `t = -2.36`, `p = 0.022`, with mean drawdown of **34.3 ppm** for
+*Chlorella* and **39.0 ppm** for *Scenedesmus*.
+
+```{r mc2, echo=FALSE}
+question(
+  "At the 0.05 level, what does this say?",
+  answer("Scenedesmus drew down significantly more CO2 than Chlorella in this experiment.", correct = TRUE),
+  answer("There is no significant difference.", message = "p = 0.022 is below 0.05."),
+  answer("Scenedesmus is the better species for every purpose.", message = "The test compares one response under one set of conditions — it does not rank the species generally."),
+  allow_retry = TRUE
+)
+```
+
+## Three or more groups: one-way ANOVA
+
+Nutrient level has three groups, so a t-test no longer fits — you run a
+**one-way ANOVA**. The course convention is `aov()` wrapped in `summary()`:
+`aov()` fits the model, `summary()` prints the F value and p-value.
+
+### Exercise q2
+
+Fit a one-way ANOVA of `co2_drawdown_ppm` by `nutrient_level` and print the summary.
+
+```{r q2, exercise=TRUE}
+summary(aov(___ ~ ___, data = algae))
+```
+
+```{r q2-hint}
+summary(aov(co2_drawdown_ppm ~ nutrient_level, data = algae))
+```
+
+```{r q2-solution}
+summary(aov(co2_drawdown_ppm ~ nutrient_level, data = algae))
+```
+
+```{r q2-check}
+grade_this({
+  if (inherits(.result, "summary.aov") && any(grepl("nutrient", rownames(.result[[1]])))) {
+    pass("F = 23.62 on 2 and 57 degrees of freedom, p = 3.4e-08. Something differs among the three nutrient levels — but ANOVA won't tell you which. That's the next step.")
+  }
+  fail("Not quite. Wrap aov(co2_drawdown_ppm ~ nutrient_level, data = algae) in summary().")
+})
+```
+
+```{r mc3, echo=FALSE}
+question(
+  "Why run one ANOVA instead of three separate t-tests (low vs. medium, low vs. high, medium vs. high)?",
+  answer("Each extra test adds another chance of a false positive, so three tests inflate the overall error rate. ANOVA asks the question once.", correct = TRUE),
+  answer("Three t-tests would give exactly the same answer, so ANOVA just saves typing.", message = "It saves typing, but that isn't the reason. Think about what happens to your chance of a false positive each time you run another test."),
+  answer("t-tests only work on two groups, so they cannot be run here at all.", message = "You could physically run them on any pair. The problem is what repeating the test does to your error rate."),
+  answer("ANOVA is more sensitive, so it always finds a difference when one exists.", message = "No test is guaranteed to detect a real difference; that depends on effect size and sample size."),
+  allow_retry = TRUE
+)
+```
+
+## Which groups differ? TukeyHSD
+
+A significant ANOVA means *at least one* group stands out, not which one. Run
+**Tukey's Honest Significant Difference** on the fitted model to compare every
+pair.
+
+### Exercise q3
+
+Write this call yourself: run `TukeyHSD()` on an `aov()` model of
+`co2_drawdown_ppm` by `nutrient_level`. Note that the post-hoc test runs on the
+**fitted model**, not on the summary of it.
+
+```{r q3, exercise=TRUE}
+
+```
+
+```{r q3-hint}
+# TukeyHSD() takes the fitted aov() object directly:
+# TukeyHSD(aov(response ~ factor, data = algae))
+```
+
+```{r q3-solution}
+TukeyHSD(aov(co2_drawdown_ppm ~ nutrient_level, data = algae))
+```
+
+```{r q3-check}
+grade_this({
+  if (inherits(.result, "TukeyHSD") && "nutrient_level" %in% names(.result)) {
+    pass("Read the `p adj` column: the high group differs from both others (p < 0.0001), but medium vs. low is not significant (p = 0.76, a difference of only 1.4 ppm). The omnibus ANOVA could never have told you that.")
+  }
+  fail("Not quite. Pass aov(co2_drawdown_ppm ~ nutrient_level, data = algae) to TukeyHSD().")
+})
+```
+
+```{r coach-ui-q3, echo=FALSE}
+BisonExplorR::coach_ui("coach_q3", "Stuck? Ask the Coach")
+```
+
+```{r mc4, echo=FALSE}
+question(
+  "The ANOVA was significant, but Tukey shows medium vs. low is not (p = 0.76). What does that mean?",
+  answer("The overall nutrient effect is driven mainly by the high group; medium and low are statistically indistinguishable.", correct = TRUE),
+  answer("The ANOVA was wrong.", message = "Both are correct — they answer different questions. ANOVA asks 'any difference?'; Tukey asks 'which pairs?'"),
+  answer("All three nutrient levels differ from each other.", message = "Tukey shows medium and low do not differ significantly."),
+  allow_retry = TRUE
+)
+```
+
+## Show the comparison
+
+Numbers convince you; a figure convinces a reader. A boxplot is the standard way
+to show a group comparison.
+
+### Exercise q4
+
+Build a boxplot of `co2_drawdown_ppm` by `nutrient_level`. Label the axes and
+finish with `theme_classic()`.
+
+```{r q4, exercise=TRUE}
+ggplot(algae, aes(x = nutrient_level, y = co2_drawdown_ppm)) +
+  geom_boxplot() +
+  labs(x = "Nutrient level", y = "CO2 drawdown (ppm)") +
+  ___
+```
+
+```{r q4-hint}
+# theme_classic()
+```
+
+```{r q4-solution}
+ggplot(algae, aes(x = nutrient_level, y = co2_drawdown_ppm)) +
+  geom_boxplot() +
+  labs(x = "Nutrient level", y = "CO2 drawdown (ppm)") +
+  theme_classic()
+```
+
+```{r q4-check}
+grade_this({
+  if (inherits(.result, "ggplot")) {
+    geoms <- vapply(.result$layers, function(l) class(l$geom)[1], character(1))
+    if (any(geoms == "GeomBoxplot")) {
+      pass("The high box sits clearly above the other two, which sit almost level with each other — the same story Tukey told, now legible at a glance.")
+    }
+  }
+  fail("Not quite. Use geom_boxplot() and finish with theme_classic().")
+})
+```
+
+## Where you landed
+
+- **Two groups ->** `t.test(response ~ group)`
+- **Three or more ->** `summary(aov(response ~ group))`, then `TukeyHSD()` to find which pairs differ
+- **Show it** with a boxplot
+
+Next module keeps a single predictor but changes its **type**: instead of a
+grouping factor, a continuous measurement. That is **linear regression**.

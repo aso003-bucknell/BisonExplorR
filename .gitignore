@@ -5,3 +5,9 @@
 .DS_Store
 .quarto
 .positai
+.RDataTmp
+.Ruserdata
+
+coach-endpoint/
+desktop.ini
+.Rproj.user/

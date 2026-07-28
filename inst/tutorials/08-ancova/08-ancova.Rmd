@@ -1,0 +1,550 @@
+---
+title: "Module 8: ANCOVA — Adding a Group to a Regression"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: >
+  Take the regression you fitted in Module 6 and add a grouping factor to it.
+  Fit an ANCOVA, read its two lines, check that the group slopes are parallel,
+  and see what separates it from a two-way ANOVA.
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(shiny)
+library(BisonExplorR)   # coach_ui() / coach_server()
+library(gradethis)
+library(ggplot2)
+library(ggpubr)   # stat_regline_equation(), stat_cor()
+library(cowplot)  # plot_grid() for multi-panel figures
+library(httr)
+
+gradethis::gradethis_setup()
+tutorial_options(
+  exercise.checker = gradethis::grade_learnr,
+  exercise.completion = TRUE
+)
+knitr::opts_chunk$set(echo = FALSE)
+
+`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
+
+# Resolve the student ID no matter which session scope a handler receives.
+# VERIFIED 2026-07-25 (learnr 0.11.6): question() blocks are Shiny MODULES, so
+# a question_submission handler gets a NAMESPACED session whose input$sid is
+# EMPTY. The ID lives on the root session. This fails silently -- rows land in
+# the sheet looking well-formed but unattributable, grade_module() drops them,
+# and the student loses that score with no warning anywhere. Do not "simplify"
+# this back to session$input$sid.
+bx_get_sid <- function(session) {
+  usable <- function(x) !is.null(x) && length(x) > 0 && nzchar(as.character(x)[1])
+  sid <- tryCatch(session$rootScope()$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$userData$bx_sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  NULL   # log_attempt()'s %||% turns this into "unknown"
+}
+
+# Is this the GRADED deployment or a practice copy?
+# Set BISONEXPLORR_GRADED=true in the deployed app's .Renviron (or set the
+# option in its startup). Practice copies launched with run_tutorial() never
+# see it, so they default to FALSE.
+#
+# WHY THE PRACTICE BRANCH SHOWS A VISIBLE BANNER RATHER THAN NOTHING: if this
+# flag is ever missing on a deployed graded app, the ID box disappears and
+# nothing logs -- every student silently scores zero. A banner makes a
+# misconfigured deploy announce itself on the first screen instead of three
+# weeks later in the response sheet.
+bx_is_graded <- function() {
+  isTRUE(getOption(
+    "BisonExplorR.graded",
+    identical(tolower(Sys.getenv("BISONEXPLORR_GRADED")), "true")
+  ))
+}
+
+log_attempt <- function(student_id, exercise_id, correct) {
+  # Practice copies do not log. Without this, practice attempts POST with
+  # student_id = "unknown" and fill the response sheet with orphan rows
+  # that look like a bug in grade_module().
+  if (!bx_is_graded()) return(invisible(NULL))
+
+  tryCatch({
+    httr::POST(
+      url = "https://docs.google.com/forms/d/e/1FAIpQLSfmm3cUcoaWWYBb0zk7rbowSpgUL13nQc-Dxn7K8zQ30GdykA/formResponse",
+      body = list(
+        "entry.1413675438" = as.character(Sys.time()),
+        "entry.1257984687" = as.character(student_id %||% "unknown"),
+        "entry.1315894547" = "module8",
+        "entry.1172625272" = as.character(exercise_id %||% "unknown"),
+        "entry.1835356043" = as.character(correct %||% "NA")
+      ),
+      encode = "form"
+    )
+  }, error = function(e) message("Logging failed: ", e$message))
+}
+
+# Shared data — must live in the setup chunk (learnr sandboxes each exercise).
+# Read from the packaged CSV so the numbers quoted in this tutorial are exactly
+# the numbers students see. Factors are pre-set here, not inline with as.factor().
+cardio <- read.csv(system.file("extdata", "cardio.csv", package = "BisonExplorR"))
+
+# Both panels for the plot_grid() section are built here rather than in the
+# exercise. learnr sandboxes each exercise, so an object created in one is
+# invisible to the next -- students would otherwise have to retype two whole
+# ggplot calls just to combine them, which tests typing, not composition.
+plot_pooled <- ggplot(cardio, aes(x = body_mass_kg, y = resting_hr_bpm)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Body mass (kg)", y = "Resting heart rate (bpm)") +
+  theme_classic()
+
+plot_ancova <- ggplot(cardio, aes(x = body_mass_kg, y = resting_hr_bpm,
+                                  colour = sex)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Body mass (kg)", y = "Resting heart rate (bpm)", colour = "Sex") +
+  theme_classic()
+cardio$sex            <- factor(cardio$sex)
+cardio$activity_level <- factor(cardio$activity_level,
+                                levels = c("sedentary", "moderate", "active"))
+```
+
+```{r event-setup, context="server-start"}
+event_register_handler("exercise_result", function(session, event, data) {
+  log_attempt(
+    student_id  = bx_get_sid(session),
+    exercise_id = data$label,
+    correct     = data$feedback$correct
+  )
+})
+```
+
+```{r coach-server, context="server"}
+# One coach_server() per coached exercise. The third argument must match a
+# key in the server-side exercise_registry.R ("moduleN-qM", HYPHENATED) --
+# an unknown key does not error, it silently returns generic context.
+# The Shiny id must match the coach_ui() call below it, or the card renders
+# and never responds.
+BisonExplorR::coach_server("coach_q1", shiny::reactive(learnr::get_tutorial_state("q1")), "module8-q1")
+BisonExplorR::coach_server("coach_q3", shiny::reactive(learnr::get_tutorial_state("q3")), "module8-q3")
+BisonExplorR::coach_server("coach_q4", shiny::reactive(learnr::get_tutorial_state("q4")), "module8-q4")
+```
+
+## Before you start
+
+```{r student-id, echo=FALSE}
+uiOutput("sid_ui")
+```
+
+```{r sid-server, context="server"}
+# The ID box exists ONLY in the graded deployment. See bx_is_graded() in setup.
+output$sid_ui <- renderUI({
+  if (!bx_is_graded()) {
+    return(shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #C05621; background:#FDF6EC;"),
+      shiny::strong("Practice mode."),
+      " Nothing here is recorded and this copy does not count for credit.",
+      " To do this module for credit, run ",
+      shiny::tags$code('launch_graded_tutorial("module8")'),
+      " instead."
+    ))
+  }
+  shiny::tagList(
+    shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #1F3864; background:#F2F4F7;"),
+      shiny::strong("Graded copy."),
+      " Your work on this module is recorded, so enter your student ID before",
+      " you begin. Use the same ID every time \u2014 a different ID reads as a",
+      " different student and your work will not be combined."
+    ),
+    shiny::textInput("sid",
+      "Student ID (the same one you used in Module 1):", value = ""),
+    shiny::div(id = "sid_warn",
+      style = "color:#C05621; font-weight:600; margin:-6px 0 8px 0;",
+      "Enter your ID to continue."),
+    # Client-side gate on the section's Continue button. This prevents the
+    # ACCIDENTAL case (a student who forgets), not a determined one -- anyone
+    # with devtools can re-enable the button. The real protection against
+    # unattributed rows is that grade_module() drops blank IDs.
+    shiny::tags$script(shiny::HTML("
+      (function () {
+        function apply() {
+          var sid = document.getElementById('sid');
+          if (!sid) return;
+          var sec = sid.closest('.section');
+          if (!sec) return;
+          var btns = sec.querySelectorAll('.topicActions button, .continueButton');
+          var ok = sid.value.trim().length > 0;
+          btns.forEach(function (b) {
+            b.disabled = !ok;
+            b.style.opacity = ok ? '' : '0.45';
+            b.style.cursor  = ok ? '' : 'not-allowed';
+          });
+          var w = document.getElementById('sid_warn');
+          if (w) w.style.display = ok ? 'none' : 'block';
+        }
+        document.addEventListener('input', function (e) {
+          if (e.target && e.target.id === 'sid') apply();
+        });
+        // learnr renders sections progressively, so the Continue button may not
+        // exist yet when this script first runs.
+        new MutationObserver(apply)
+          .observe(document.body, { childList: true, subtree: true });
+        apply();
+      })();
+    "))
+  )
+})
+
+# Cache the ID on userData as a second, independent path to it. bx_get_sid()
+# checks rootScope() first and falls back to this.
+shiny::observeEvent(input$sid, {
+  if (!is.null(input$sid) && nzchar(input$sid)) {
+    session$userData$bx_sid <- input$sid
+  }
+}, ignoreInit = TRUE)
+```
+
+
+We're back to the `cardio` dataset: resting heart rate for 120 people, with their sex, activity
+level, and body mass.
+
+```{r peek, exercise=TRUE}
+head(cardio)
+```
+
+---
+
+## The map: which test, when
+
+Keep this table in view — it is the same in every statistics module. The last
+column tells you where each test is taught.
+
+| Biological question | Predictor(s) | Test | R function | Module |
+|---|---|---|---|---|
+| Do **two** groups differ? | one factor, 2 levels | t-test | `t.test()` | 5 |
+| Do **three or more** groups differ? | one factor, 3+ levels | one-way ANOVA | `aov()` + `summary()` | 5 |
+| Does a **continuous** variable predict the response? | one continuous | linear regression | `lm()` + `summary()` | 6 |
+| Do groups differ across **two factors**? | two factors | two-way ANOVA | `aov()` + `summary()` | 7 |
+| Do groups differ **after controlling for** a continuous variable? | factor + covariate | ANCOVA | `aov()` + `summary()` | **8** |
+
+**Where you are:** Module 8 — a continuous predictor with a grouping factor added to it.
+
+---
+
+## Quick review: the regression from Module 6
+
+In Module 6 you fitted a line with `lm(response ~ predictor)` and read four things out of its
+summary: the **slope** (with units), the **intercept**, the **R^2^**, and the **p-value** on the
+slope.
+
+The same machinery works on `cardio`. Heavier people tend to have faster resting heart rates, and
+one `lm()` call says how much:
+
+```{r review_lm, echo=TRUE}
+summary(lm(resting_hr_bpm ~ body_mass_kg, data = cardio))
+```
+
+Reading it the way you learned in Module 6: the slope is **+0.46 bpm per kg** with
+p ≈ 2.6 × 10^-8^, and the adjusted R^2^ is **0.23**, so body mass explains a little under a
+quarter of the variation in resting heart rate. Real, but far from the whole story.
+
+```{r review_check, echo=FALSE}
+question(
+  "The slope is +0.46 with p < 0.001 and adjusted R^2^ = 0.23. Which reading is correct?",
+  answer("Each additional kilogram is associated with about 0.46 more bpm; the relationship is unlikely to be chance, but mass explains only about a quarter of the variation.", correct = TRUE, message = "Exactly — the slope and the R^2^ answer different questions, and you need both."),
+  answer("Heart rate rises by 46 bpm per kilogram.", message = "The slope is 0.46 bpm per kg, not 46. Watch the decimal — and sanity-check it against biology."),
+  answer("Body mass explains almost all of the variation in heart rate.", message = "Adjusted R^2^ is 0.23 — about a quarter. A tiny p-value doesn't mean a large R^2^."),
+  answer("Because p < 0.001, body mass causes the change in heart rate.", message = "Causation comes from the study design, not the p-value. This is observational data."),
+  allow_retry = TRUE
+)
+```
+
+**That's the review.** Everything below is new: what happens when the people in that scatter plot
+belong to *groups*.
+
+---
+
+## Add a group: ANCOVA
+
+Here is the key move. That regression has one continuous predictor and treats all 120 people as
+interchangeable. But what if the two sexes sit at **different heart rates** on top of the mass
+relationship?
+
+Adding the grouping factor `sex` to the model turns the regression into an **ANCOVA** — analysis
+of covariance. Read it as **regression plus a group difference**: the question becomes *do the
+sexes differ once body mass is accounted for?*
+
+Two conventions, both house style:
+
+- Use **`aov()` + `summary()`**, the same pair you used for ANOVA in Modules 5 and 7.
+- Put the **covariate first**, then the factor: `response ~ covariate + factor`. Order matters
+  here — `aov()` assigns variation to terms in the order you write them, so writing the covariate
+  first means the group effect is tested *after* mass has already been accounted for. That is
+  precisely the question ANCOVA is for.
+
+### Your turn
+
+Fit an ANCOVA of `resting_hr_bpm` with `body_mass_kg` as the covariate and `sex` as the factor,
+and print the summary.
+
+```{r q1, exercise=TRUE}
+summary(aov(resting_hr_bpm ~ ___ + ___, data = cardio))
+```
+
+```{r q1-hint}
+# Covariate first, then the factor.
+summary(aov(resting_hr_bpm ~ body_mass_kg + sex, data = cardio))
+```
+
+```{r q1-check}
+grade_this({
+  if (!inherits(.result, "summary.aov")) {
+    fail("That didn't return an ANOVA table. Wrap your aov() call in summary().")
+  }
+  terms <- rownames(.result[[1]])
+  if (!any(grepl("body_mass", terms)) || !any(grepl("sex", terms))) {
+    fail("The model needs both terms: summary(aov(resting_hr_bpm ~ body_mass_kg + sex, data = cardio)).")
+  }
+  if (which(grepl("body_mass", terms))[1] > which(grepl("sex", terms))[1]) {
+    fail("Both terms are there, but in the wrong order. Put the covariate first: body_mass_kg + sex.")
+  }
+  pass("Both rows are significant: body mass F = 39.5, p < 0.001; sex F = 13.9, p = 0.0003. Sex still matters after adjusting for mass.")
+})
+```
+
+```{r coach-ui-q1, echo=FALSE}
+BisonExplorR::coach_ui("coach_q1", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+Your table should read:
+
+```
+              Df Sum Sq Mean Sq F value   Pr(>F)
+body_mass_kg   1   2401  2400.7  39.534 5.75e-09 ***
+sex            1    842   842.0  13.865 0.000304 ***
+Residuals    117   7105    60.7
+```
+
+The `sex` row is the payoff. It says the sexes differ by more than chance **even after** body mass
+has been taken out — so the difference isn't just because one group happens to be heavier.
+
+```{r q1_interp, echo=FALSE}
+question(
+  "You now have two models with two predictors. What separates the two-way ANOVA of Module 7 from this ANCOVA?",
+  answer("The type of the second predictor: a categorical factor in the two-way ANOVA, a continuous covariate here.", correct = TRUE, message = "That's the whole distinction. The code shape is identical."),
+  answer("Two-way ANOVA uses aov() but ANCOVA uses lm().", message = "Both use aov() here; the call looks the same. What differs is what kind of variable you put in it."),
+  answer("ANCOVA cannot include a grouping factor.", message = "It must — ANCOVA specifically combines a factor with a continuous covariate."),
+  answer("ANCOVA tests an interaction and two-way ANOVA does not.", message = "Backwards, if anything. The two-way ANOVA in Module 7 tested an interaction; the ANCOVA you just fitted has no interaction term."),
+  allow_retry = TRUE
+)
+```
+
+---
+
+## Show the ANCOVA
+
+The picture of an ANCOVA is **one regression line per group** — the mass–heart rate slope drawn
+separately for each sex. If the model is right, those lines should be roughly **parallel**, offset
+vertically by the group difference.
+
+### Your turn
+
+Plot `resting_hr_bpm` against `body_mass_kg`, colour by `sex`, and give each sex its own line with
+`geom_smooth(method = "lm", se = FALSE)`.
+
+```{r q2, exercise=TRUE}
+ggplot(cardio, aes(x = body_mass_kg, y = resting_hr_bpm, colour = ___)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_classic()
+```
+
+```{r q2-hint}
+# colour = sex
+```
+
+```{r q2-check}
+grade_this({
+  if (!inherits(.result, "ggplot")) {
+    fail("That didn't return a plot.")
+  }
+  aes_names <- names(.result$mapping)
+  geoms <- vapply(.result$layers, function(l) class(l$geom)[1], character(1))
+  if (!any(c("colour", "color") %in% aes_names)) {
+    fail("Map colour = sex inside aes() — that's what splits the data into two lines.")
+  }
+  if (!any(geoms %in% c("GeomSmooth", "GeomLine"))) {
+    fail("Keep geom_smooth(method = 'lm', se = FALSE) so each group gets a fitted line.")
+  }
+  pass("Two lines, one per sex — and notice how nearly parallel they are. That matters; it's the next section.")
+})
+```
+
+---
+
+## Checking the assumption: are the slopes parallel?
+
+Look again at those two lines. ANCOVA assumes the groups share a **common slope** — that mass
+affects heart rate the same way in both sexes, and the only difference between groups is the
+vertical offset. This is called the **homogeneity of slopes** assumption, and it isn't optional:
+if the slopes genuinely differ, a single "sex effect" is meaningless, because the size of the sex
+difference would depend on which body mass you asked about.
+
+You test it by fitting the model **with an interaction** — `covariate * factor` instead of
+`covariate + factor` — and looking at the interaction row. The logic is exactly the interaction
+you met in Module 7's two-way ANOVA, just with a measurement on one side.
+
+Here you want the interaction to be **non-significant**. That's the unusual case where a large
+p-value is the good news.
+
+### Your turn
+
+Refit the model with an interaction between `body_mass_kg` and `sex` by changing the `+` to a `*`.
+
+```{r q3, exercise=TRUE}
+summary(aov(resting_hr_bpm ~ body_mass_kg ___ sex, data = cardio))
+```
+
+```{r q3-hint}
+# The * operator fits both main effects AND their interaction.
+summary(aov(resting_hr_bpm ~ body_mass_kg * sex, data = cardio))
+```
+
+```{r q3-check}
+grade_this({
+  if (!inherits(.result, "summary.aov")) {
+    fail("That didn't return an ANOVA table. Wrap the aov() call in summary().")
+  }
+  terms <- rownames(.result[[1]])
+  if (!any(grepl(":", terms))) {
+    fail("No interaction row appeared. Change the + to a * so the model includes body_mass_kg:sex.")
+  }
+  pass("The interaction row: F = 0.01, p = 0.90. Nowhere near significant — the slopes are parallel, so the ANCOVA you fitted is appropriate.")
+})
+```
+
+```{r coach-ui-q3, echo=FALSE}
+BisonExplorR::coach_ui("coach_q3", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+The interaction line comes out at **F = 0.01, p = 0.90**. The two slopes are 0.50 bpm/kg for
+females and 0.49 for males — very nearly identical, which is what the plot already hinted at.
+
+So the assumption holds, and you report the **simpler additive model** from earlier, not this one.
+The interaction model was a check, not the result.
+
+```{r q3_interp, echo=FALSE}
+question(
+  "Suppose the interaction had come back p = 0.002 instead. What would that mean?",
+  answer("Mass affects heart rate differently in the two sexes, so a single 'sex difference' can't be reported — the difference depends on body mass.", correct = TRUE, message = "Right. A significant interaction invalidates the additive ANCOVA; you'd describe each group's slope separately."),
+  answer("The ANCOVA result is stronger.", message = "The opposite — a significant interaction means the additive model's group effect isn't interpretable."),
+  answer("You should remove sex from the model.", message = "No — a significant interaction means sex matters *more* intricately, not less."),
+  answer("Nothing changes; you'd report the additive model anyway.", message = "That's the trap. Reporting an additive group effect when slopes genuinely differ misrepresents the data."),
+  allow_retry = TRUE
+)
+```
+
+---
+
+## Two figures, one panel
+
+A result usually needs more than one picture. Here you have two: the **pooled** regression from the
+review section, which ignores sex, and the **ANCOVA** figure from earlier, which splits it. Side by
+side they make the argument that neither makes alone — the group structure was there the whole time,
+and the pooled line was hiding it.
+
+Putting them side by side is what `plot_grid()` from the **cowplot** package does. You hand it two
+or more plots and it arranges them in a grid:
+
+```{r pg_demo, echo=TRUE}
+plot_grid(plot_pooled, plot_ancova)
+```
+
+Two arguments do most of the work:
+
+- **`labels = c("A", "B")`** puts a panel letter on each. Journals expect them, and so does your lab
+  report — it is how the caption refers to each panel.
+- **`ncol =`** or **`nrow =`** controls the arrangement. Two plots default to side by side; `ncol = 1`
+  stacks them instead.
+
+Both plots are already built for you here as `plot_pooled` and `plot_ancova`. On an exam you would
+build them first and save each one to a name, exactly as you did in Module 4 — **a plot you did not
+save to an object cannot be combined later.**
+
+### Your turn
+
+Combine `plot_pooled` and `plot_ancova` into one figure, labelled **A** and **B**.
+
+```{r q4, exercise=TRUE}
+plot_grid(___, ___, labels = ___)
+```
+
+```{r q4-hint}
+# The first two arguments are the plot objects themselves, unquoted.
+# labels takes a character vector, one entry per panel.
+```
+
+```{r q4-check}
+grade_this({
+  code <- paste(.user_code, collapse = "\n")
+  if (!inherits(.result, "ggplot")) {
+    fail("That didn't return a figure. plot_grid() should be the last thing your code produces.")
+  }
+  if (!grepl("plot_grid", code)) {
+    fail("Use plot_grid() to combine them — stacking two separate calls won't make one figure.")
+  }
+  if (!grepl("plot_pooled", code) || !grepl("plot_ancova", code)) {
+    fail("Pass both plots: plot_pooled and plot_ancova, unquoted, as the first two arguments.")
+  }
+  if (!grepl("labels", code)) {
+    fail('Add labels = c("A", "B") so each panel is identified.')
+  }
+  if (!grepl('labels\\s*=\\s*c\\(', code)) {
+    fail('labels takes a vector — write labels = c("A", "B"), not a single string.')
+  }
+  pass("Two panels, labelled. That figure is the whole ANCOVA argument in one image.")
+})
+```
+
+```{r coach-ui-q4, echo=FALSE}
+BisonExplorR::coach_ui("coach_q4", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+### Saving it
+
+A multi-panel figure is saved the same way as any other, with `ggsave()` from Module 4 — save the
+combined figure to a name first, then write it out:
+
+```{r pg_save, echo=TRUE, eval=FALSE}
+combined <- plot_grid(plot_pooled, plot_ancova, labels = c("A", "B"))
+ggsave("ancova_figure.png", combined, width = 10, height = 5)
+```
+
+`width` and `height` are in inches. A two-panel figure needs to be wider than it is tall, or the
+panels come out squeezed.
+
+---
+
+## Where you landed
+
+- **ANCOVA = regression + a grouping factor:** `summary(aov(response ~ covariate + factor))`, covariate first
+- Its question is *do the groups differ **after** the covariate is accounted for?*
+- Its figure is **one regression line per group**
+- The only thing separating it from a **two-way ANOVA** is that the second predictor is a **measurement**, not a factor
+- Before trusting it, check **homogeneity of slopes** with `covariate * factor`; you want that interaction to be **non-significant**
+- Combine figures into one labelled panel with **`plot_grid()`** (cowplot), and save it with `ggsave()`
+
+Next up is **Module 9**, a capstone that mixes every test you've met — given a biological question,
+which one do you reach for?

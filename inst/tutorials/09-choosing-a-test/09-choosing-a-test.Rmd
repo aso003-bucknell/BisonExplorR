@@ -1,0 +1,408 @@
+---
+title: "Module 9: Choosing the Right Test"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: >
+  A capstone across Modules 5-7. Given a biological question, decide which test
+  fits and run it — the selection skill the exams assess.
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(shiny)
+library(BisonExplorR)   # coach_ui() / coach_server()
+library(gradethis)
+library(httr)
+gradethis::gradethis_setup()
+tutorial_options(
+  exercise.checker = gradethis::grade_learnr,
+  exercise.completion = TRUE
+)
+knitr::opts_chunk$set(echo = FALSE)
+
+`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
+
+# Resolve the student ID no matter which session scope a handler receives.
+# VERIFIED 2026-07-25 (learnr 0.11.6): question() blocks are Shiny MODULES, so
+# a question_submission handler gets a NAMESPACED session whose input$sid is
+# EMPTY. The ID lives on the root session. This fails silently -- rows land in
+# the sheet looking well-formed but unattributable, grade_module() drops them,
+# and the student loses that score with no warning anywhere. Do not "simplify"
+# this back to session$input$sid.
+bx_get_sid <- function(session) {
+  usable <- function(x) !is.null(x) && length(x) > 0 && nzchar(as.character(x)[1])
+  sid <- tryCatch(session$rootScope()$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$userData$bx_sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  NULL   # log_attempt()'s %||% turns this into "unknown"
+}
+
+# Is this the GRADED deployment or a practice copy?
+# Set BISONEXPLORR_GRADED=true in the deployed app's .Renviron (or set the
+# option in its startup). Practice copies launched with run_tutorial() never
+# see it, so they default to FALSE.
+#
+# WHY THE PRACTICE BRANCH SHOWS A VISIBLE BANNER RATHER THAN NOTHING: if this
+# flag is ever missing on a deployed graded app, the ID box disappears and
+# nothing logs -- every student silently scores zero. A banner makes a
+# misconfigured deploy announce itself on the first screen instead of three
+# weeks later in the response sheet.
+bx_is_graded <- function() {
+  isTRUE(getOption(
+    "BisonExplorR.graded",
+    identical(tolower(Sys.getenv("BISONEXPLORR_GRADED")), "true")
+  ))
+}
+
+log_attempt <- function(student_id, exercise_id, correct) {
+  # Practice copies do not log. Without this, practice attempts POST with
+  # student_id = "unknown" and fill the response sheet with orphan rows
+  # that look like a bug in grade_module().
+  if (!bx_is_graded()) return(invisible(NULL))
+
+  tryCatch({
+    httr::POST(
+      url = "https://docs.google.com/forms/d/e/1FAIpQLSfmm3cUcoaWWYBb0zk7rbowSpgUL13nQc-Dxn7K8zQ30GdykA/formResponse",
+      body = list(
+        "entry.1413675438" = as.character(Sys.time()),
+        "entry.1257984687" = as.character(student_id %||% "unknown"),
+        "entry.1315894547" = "module9",
+        "entry.1172625272" = as.character(exercise_id %||% "unknown"),
+        "entry.1835356043" = as.character(correct %||% "NA")
+      ),
+      encode = "form"
+    )
+  }, error = function(e) message("Logging failed: ", e$message))
+}
+
+# Shared data — must live in the setup chunk (learnr sandboxes each exercise).
+# Reads the packaged CSV so M8 and M9 are guaranteed the same 120 subjects.
+# MIGRATED 2026-07-28 off inline set.seed(204). The old block asserted it was
+# "identical to cardio.csv" but that was never verified, and sample() makes it
+# R-version-dependent (sample.kind changed in R 3.6.0). Same file, no drift.
+cardio <- read.csv(system.file("extdata", "cardio.csv", package = "BisonExplorR"))
+
+# Factors pre-set here per house style, never inline as.factor() in an exercise.
+# activity_level MUST be ordered explicitly: alphabetical would give
+# active/moderate/sedentary, changing the reference level in every model and
+# the axis order on every plot.
+cardio$sex            <- factor(cardio$sex)
+cardio$activity_level <- factor(cardio$activity_level,
+                                levels = c("sedentary", "moderate", "active"))
+```
+
+```{r event-setup, context="server-start"}
+event_register_handler("exercise_result", function(session, event, data) {
+  log_attempt(
+    student_id  = bx_get_sid(session),
+    exercise_id = data$label,
+    correct     = data$feedback$correct
+  )
+})
+```
+
+```{r coach-server, context="server"}
+# One coach_server() per coached exercise. The third argument must match a
+# key in the server-side exercise_registry.R ("moduleN-qM", HYPHENATED) --
+# an unknown key does not error, it silently returns generic context.
+# The Shiny id must match the coach_ui() call below it, or the card renders
+# and never responds.
+BisonExplorR::coach_server("coach_q1", shiny::reactive(learnr::get_tutorial_state("q1")), "module9-q1")
+BisonExplorR::coach_server("coach_q2", shiny::reactive(learnr::get_tutorial_state("q2")), "module9-q2")
+BisonExplorR::coach_server("coach_q3", shiny::reactive(learnr::get_tutorial_state("q3")), "module9-q3")
+```
+
+
+## Before you start
+
+```{r student-id, echo=FALSE}
+uiOutput("sid_ui")
+```
+
+```{r sid-server, context="server"}
+# The ID box exists ONLY in the graded deployment. See bx_is_graded() in setup.
+output$sid_ui <- renderUI({
+  if (!bx_is_graded()) {
+    return(shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #C05621; background:#FDF6EC;"),
+      shiny::strong("Practice mode."),
+      " Nothing here is recorded and this copy does not count for credit.",
+      " To do this module for credit, run ",
+      shiny::tags$code('launch_graded_tutorial("module9")'),
+      " instead."
+    ))
+  }
+  shiny::tagList(
+    shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #1F3864; background:#F2F4F7;"),
+      shiny::strong("Graded copy."),
+      " Your work on this module is recorded, so enter your student ID before",
+      " you begin. Use the same ID every time \u2014 a different ID reads as a",
+      " different student and your work will not be combined."
+    ),
+    shiny::textInput("sid",
+      "Student ID (the same one you used in Module 1):", value = ""),
+    shiny::div(id = "sid_warn",
+      style = "color:#C05621; font-weight:600; margin:-6px 0 8px 0;",
+      "Enter your ID to continue."),
+    # Client-side gate on the section's Continue button. This prevents the
+    # ACCIDENTAL case (a student who forgets), not a determined one -- anyone
+    # with devtools can re-enable the button. The real protection against
+    # unattributed rows is that grade_module() drops blank IDs.
+    shiny::tags$script(shiny::HTML("
+      (function () {
+        function apply() {
+          var sid = document.getElementById('sid');
+          if (!sid) return;
+          var sec = sid.closest('.section');
+          if (!sec) return;
+          var btns = sec.querySelectorAll('.topicActions button, .continueButton');
+          var ok = sid.value.trim().length > 0;
+          btns.forEach(function (b) {
+            b.disabled = !ok;
+            b.style.opacity = ok ? '' : '0.45';
+            b.style.cursor  = ok ? '' : 'not-allowed';
+          });
+          var w = document.getElementById('sid_warn');
+          if (w) w.style.display = ok ? 'none' : 'block';
+        }
+        document.addEventListener('input', function (e) {
+          if (e.target && e.target.id === 'sid') apply();
+        });
+        // learnr renders sections progressively, so the Continue button may not
+        // exist yet when this script first runs.
+        new MutationObserver(apply)
+          .observe(document.body, { childList: true, subtree: true });
+        apply();
+      })();
+    "))
+  )
+})
+
+# Cache the ID on userData as a second, independent path to it. bx_get_sid()
+# checks rootScope() first and falls back to this.
+shiny::observeEvent(input$sid, {
+  if (!is.null(input$sid) && nzchar(input$sid)) {
+    session$userData$bx_sid <- input$sid
+  }
+}, ignoreInit = TRUE)
+```
+
+
+## The map: which test, when
+
+This is the whole toolkit from Modules 5-7 in one place. The exam does not tell
+you which test to use — you decide from the question. That decision is what this
+module practices.
+
+| Biological question | Predictor(s) | Test | R function | Module |
+|---|---|---|---|---|
+| Do **two** groups differ? | one factor, 2 levels | t-test | `t.test()` | 5 |
+| Do **three or more** groups differ? | one factor, 3+ levels | one-way ANOVA | `aov()` + `summary()` | 5 |
+| Do groups differ across **two factors**? | two factors | two-way ANOVA | `aov()` + `summary()` | 7 |
+| Does a **continuous** variable predict the response? | one continuous | linear regression | `lm()` + `summary()` | 6 |
+| Do groups differ **after controlling for** a continuous variable? | factor + covariate | ANCOVA | `aov()` + `summary()` | 8 |
+
+**Where you are:** Module 9 — putting all of it together.
+
+## A method for reading any question
+
+Every "which test?" decision comes down to three questions you ask *about the
+question*:
+
+1. **What is the response?** The thing you measured — here, almost always
+   `resting_hr_bpm`.
+2. **What is the predictor, and how many?** One or two.
+3. **Is each predictor a group or a measurement?** A factor (groups) or a
+   continuous number.
+
+Answer those three and the table above points to exactly one test. Work the
+scenarios below that way.
+
+## Scenario practice
+
+```{r s1, echo=FALSE}
+question(
+  "Do sedentary, moderate, and active people differ in resting heart rate?",
+  answer("One-way ANOVA", correct = TRUE, message = "One factor with three levels — one-way ANOVA, then Tukey to see which groups differ."),
+  answer("t-test", message = "A t-test compares exactly two groups; activity level has three."),
+  answer("Linear regression", message = "The predictor is a set of groups, not a continuous measurement."),
+  answer("ANCOVA", message = "There is no continuous covariate to control for here."),
+  allow_retry = TRUE
+)
+```
+
+```{r s2, echo=FALSE}
+question(
+  "Does resting heart rate differ between females and males?",
+  answer("t-test", correct = TRUE, message = "Exactly two groups, one factor — a t-test."),
+  answer("One-way ANOVA", message = "ANOVA is for three or more groups."),
+  answer("ANCOVA", message = "No continuous covariate is mentioned."),
+  answer("Linear regression", message = "Sex is a group, not a continuous measurement."),
+  allow_retry = TRUE
+)
+```
+
+```{r s3, echo=FALSE}
+question(
+  "Does body mass predict resting heart rate?",
+  answer("Linear regression", correct = TRUE, message = "A continuous predictor and a continuous response — regression."),
+  answer("One-way ANOVA", message = "Body mass is a measurement, not a set of groups."),
+  answer("t-test", message = "There are no two groups to compare."),
+  answer("Two-way ANOVA", message = "There is only one predictor, and it is continuous."),
+  allow_retry = TRUE
+)
+```
+
+```{r s4, echo=FALSE}
+question(
+  "Does resting heart rate differ between the sexes *after accounting for* body mass?",
+  answer("ANCOVA", correct = TRUE, message = "A grouping factor (sex) plus a continuous covariate (body mass) to control for — ANCOVA."),
+  answer("Two-way ANOVA", message = "Two-way ANOVA needs two *factors*. Body mass is continuous, so this is ANCOVA."),
+  answer("Linear regression", message = "Regression alone would miss the group comparison you're asked for."),
+  answer("t-test", message = "A plain t-test can't control for body mass."),
+  allow_retry = TRUE
+)
+```
+
+```{r s5, echo=FALSE}
+question(
+  "Does resting heart rate depend on activity level and sex together — including whether the activity effect differs by sex?",
+  answer("Two-way ANOVA", correct = TRUE, message = "Two grouping factors, and the phrase 'differs by sex' asks for the interaction — two-way ANOVA with activity_level * sex."),
+  answer("ANCOVA", message = "Both predictors here are factors, not a factor plus a continuous covariate."),
+  answer("One-way ANOVA", message = "One-way ANOVA handles a single factor; you have two."),
+  answer("Two separate t-tests", message = "Running the factors separately loses the interaction and the joint model."),
+  allow_retry = TRUE
+)
+```
+
+```{r s6, echo=FALSE}
+question(
+  "A classmate wants to compare the three activity groups by running three separate t-tests. What's the problem?",
+  answer("Repeated t-tests inflate the false-positive rate; use one ANOVA, then Tukey for the pairwise comparisons.", correct = TRUE),
+  answer("Nothing — three t-tests is the correct approach.", message = "Each extra test adds a chance of a false positive; that's exactly what ANOVA + Tukey is designed to avoid."),
+  answer("t-tests can't be used on heart rate data.", message = "They can; the issue is running many of them on the same question."),
+  allow_retry = TRUE
+)
+```
+
+## Now run it
+
+For each scenario, decide on the test, then **write and run it** on `cardio`.
+
+### Exercise q1
+
+*Do females and males differ in resting heart rate?* Choose the right test and
+run it.
+
+```{r q1, exercise=TRUE}
+
+```
+
+```{r q1-hint}
+# Two groups, one factor.
+t.test(resting_hr_bpm ~ sex, data = cardio)
+```
+
+```{r q1-solution}
+t.test(resting_hr_bpm ~ sex, data = cardio)
+```
+
+```{r q1-check}
+grade_this({
+  if (inherits(.result, "htest") && grepl("sex", .result$data.name)) {
+    pass("Two groups, one t-test.")
+  }
+  fail("This question compares two groups. Use t.test(resting_hr_bpm ~ sex, data = cardio).")
+})
+```
+
+```{r coach-ui-q1, echo=FALSE}
+BisonExplorR::coach_ui("coach_q1", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+### Exercise q2
+
+*Does body mass predict resting heart rate?* Choose the right test and run it.
+
+```{r q2, exercise=TRUE}
+
+```
+
+```{r q2-hint}
+# One continuous predictor.
+summary(lm(resting_hr_bpm ~ body_mass_kg, data = cardio))
+```
+
+```{r q2-solution}
+summary(lm(resting_hr_bpm ~ body_mass_kg, data = cardio))
+```
+
+```{r q2-check}
+grade_this({
+  if (inherits(.result, "summary.lm") && any(grepl("body_mass", rownames(coef(.result))))) {
+    pass("A continuous predictor calls for regression.")
+  }
+  fail("This asks whether a continuous variable predicts the response. Use summary(lm(resting_hr_bpm ~ body_mass_kg, data = cardio)).")
+})
+```
+
+```{r coach-ui-q2, echo=FALSE}
+BisonExplorR::coach_ui("coach_q2", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+### Exercise q3
+
+*Do the three activity groups differ in resting heart rate after controlling for
+body mass?* Choose the right test and run it.
+
+```{r q3, exercise=TRUE}
+
+```
+
+```{r q3-hint}
+# A grouping factor plus a continuous covariate to control for — covariate first.
+summary(aov(resting_hr_bpm ~ body_mass_kg + activity_level, data = cardio))
+```
+
+```{r q3-solution}
+summary(aov(resting_hr_bpm ~ body_mass_kg + activity_level, data = cardio))
+```
+
+```{r q3-check}
+grade_this({
+  if (inherits(.result, "summary.aov")) {
+    terms <- rownames(.result[[1]])
+    if (any(grepl("body_mass", terms)) && any(grepl("activity", terms))) {
+      pass("A factor plus a covariate to control for — that's ANCOVA, covariate first.")
+    }
+  }
+  fail("This controls for a continuous covariate while comparing groups. Use summary(aov(resting_hr_bpm ~ body_mass_kg + activity_level, data = cardio)).")
+})
+```
+
+```{r coach-ui-q3, echo=FALSE}
+BisonExplorR::coach_ui("coach_q3", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+## You've finished the sequence
+
+You can now match a biological question to the right test, run it, read the
+output, and show it in a figure — from a two-group t-test all the way to ANCOVA.
+When an exam question asks you to *choose* a test, come back to the three
+questions: what is the response, how many predictors, and is each a group or a
+measurement. The exam scope for all of this is stated in your syllabus.

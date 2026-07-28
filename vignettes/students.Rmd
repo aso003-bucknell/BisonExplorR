@@ -1,0 +1,190 @@
+---
+title: "For students"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{For students}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+This guide covers everything you need to do BIOL 204 R work: opening tutorials,
+getting lab scripts, and practising for exams. If you are new to R, start at the top
+and read straight through — it takes about ten minutes.
+
+You do not need to install R on your own computer. All of this runs in **Posit Cloud**
+in a web browser.
+
+## Getting set up
+
+Open the course Posit Cloud workspace using the link on Moodle, then run:
+
+```{r}
+library(BisonExplorR)
+```
+
+If that produces an error saying the package is not found, tell your instructor rather
+than trying to install it yourself — the workspace should already have it.
+
+## Two ways to open a tutorial
+
+Every tutorial exists in two versions, and **they are not interchangeable**.
+
+### The graded version
+
+This is the one that counts. Open it with:
+
+```{r}
+launch_graded_tutorial("module5")
+```
+
+Run it with no arguments to see the full list:
+
+```{r}
+launch_graded_tutorial()
+```
+
+The graded copy opens with a **navy banner** reading "Graded copy" and asks for your
+student ID. You cannot continue past that first section until you enter it.
+
+### The practice version
+
+Use this to review, or to work through a module a second time without it being recorded:
+
+```{r}
+learnr::run_tutorial("05-groups", package = "BisonExplorR")
+```
+
+The practice copy opens with an **orange banner** reading "Practice mode". It records
+nothing.
+
+### How to tell them apart
+
+| You see | You are in | Your work is |
+|---|---|---|
+| Navy banner + student ID box | the graded copy | recorded |
+| Orange banner, no ID box | a practice copy | not recorded |
+
+**If you open a tutorial for credit and see the orange banner, stop and email your
+instructor.** It means something is misconfigured and your work is not being saved.
+This is worth thirty seconds of your time — it is much easier to fix before you have
+done the whole module.
+
+## Your student ID
+
+Use **the same ID every single time**, in every module, all semester.
+
+The system has no way to know that two different IDs belong to the same person. If you
+use your Bucknell email in Module 3 and your ID number in Module 4, those look like two
+separate students, and neither one has completed both modules.
+
+If you realise partway through the semester that you have been inconsistent, tell your
+instructor — it can be fixed, but only if someone knows.
+
+## How tutorials are graded
+
+Each graded module is worth 10 points:
+
+- **5 points for completion** — did you submit an answer to each exercise?
+- **5 points for correctness** — did you eventually get each one right?
+
+**Wrong attempts do not cost you anything.** You can submit an exercise as many times as
+you like; what is recorded is whether you ever got it right. Guessing and revising is the
+intended way to use these tutorials, not a fallback.
+
+One thing to know: **Run and Submit are different buttons.** Running code shows you the
+output, but only Submit records an answer. If you run everything and submit nothing, your
+completion score will be zero even though you did all the work.
+
+## The Coach
+
+Some exercises have a **"Stuck? Ask the Coach"** button below them. The Coach is an AI
+tutor that reads the code you last submitted and gives you one nudge toward the next step.
+
+It will not give you the answer. That is deliberate — it will name a concept, point at a
+function, or ask you a question about your own code, then stop and let you try. If you ask
+it for the solution outright, it will decline and offer a hint instead.
+
+Two practical notes:
+
+- **The Coach reads your last *submitted* attempt**, not code you only ran. Submit
+  something first, even if you know it is wrong.
+- The Coach appears only on the exercises where students most often get stuck, so most
+  exercises do not have one. That is normal.
+
+## In-lab scripts
+
+Lab work happens in plain R scripts you edit with a partner. Copy one into your project
+with:
+
+```{r}
+get_lab("comparing-groups")
+```
+
+Run it with no arguments to see what is available:
+
+```{r}
+get_lab()
+```
+
+The file appears in your Files pane and opens in the editor. It is yours to edit — that
+is the point.
+
+If you have already started one and want to begin again from scratch:
+
+```{r}
+get_lab("comparing-groups", overwrite = TRUE)
+```
+
+That **erases the work you have done in that file**, so only use it if you mean it.
+
+## Practising for exams
+
+Practice exams use different organisms and different numbers from the real thing, but the
+same structure, the same skills, and the same point weighting.
+
+Get the datasets with:
+
+```{r}
+get_practice_exam("exam2")
+```
+
+This copies the CSV files into your project. That matters more than it looks: on exam day
+the data files are already sitting in your project, so your code reads them by plain
+filename:
+
+```{r}
+turtles <- read.csv("turtle_growth.csv")
+```
+
+Practising the same way means the code you have rehearsed is the code that works under
+time pressure.
+
+## Your code library
+
+Keep one script — start it with `get_lab("code-library-starter")` — where you save
+working code with a short comment about what it does and when to use it. Add to it every
+week rather than at the end.
+
+You are allowed to use it during exams. Students who build one as they go consistently
+report it was the single most useful thing they had; students who assemble one the night
+before find it is mostly a list of things they cannot remember the purpose of.
+
+## If something goes wrong
+
+**"could not find function"** — you have not run `library(BisonExplorR)` in this session,
+or the tutorial's setup did not finish loading. Restart R and try again.
+
+**"object not found"** in an exercise — each exercise runs in its own sandbox, so an
+object you created in an earlier exercise is not available. Everything you need is loaded
+for you; check the spelling against the dataset table at the top of the section.
+
+**A file is already in your project** — `get_lab()` and `get_practice_exam()` refuse to
+overwrite your work by default. Either rename your copy, or pass `overwrite = TRUE` if you
+genuinely want to start over.
+
+**The tutorial will not let you continue** — check that you have entered your student ID
+in the first section. In the graded copy, the Continue button stays disabled until you do.

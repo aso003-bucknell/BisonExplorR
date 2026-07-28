@@ -1,0 +1,594 @@
+---
+title: "Module 4: Data Wrangling and Visualization"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: false
+runtime: shiny_prerendered
+description: "Reshape a dataset with dplyr and build figures with ggplot2, including a fitted regression line."
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(shiny)
+library(BisonExplorR)   # coach_ui() / coach_server()
+library(gradethis)
+library(httr)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+
+gradethis_setup()
+
+tutorial_options(
+  exercise.checker = gradethis::grade_learnr,
+  exercise.completion = TRUE
+)
+
+`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
+
+# Resolve the student ID no matter which session scope a handler receives.
+# VERIFIED 2026-07-25 (learnr 0.11.6): question() blocks are Shiny MODULES, so
+# a question_submission handler gets a NAMESPACED session whose input$sid is
+# EMPTY. The ID lives on the root session. This fails silently -- rows land in
+# the sheet looking well-formed but unattributable, grade_module() drops them,
+# and the student loses that score with no warning anywhere. Do not "simplify"
+# this back to session$input$sid.
+bx_get_sid <- function(session) {
+  usable <- function(x) !is.null(x) && length(x) > 0 && nzchar(as.character(x)[1])
+  sid <- tryCatch(session$rootScope()$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$userData$bx_sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  NULL   # log_attempt()'s %||% turns this into "unknown"
+}
+
+# Is this the GRADED deployment or a practice copy?
+# Set BISONEXPLORR_GRADED=true in the deployed app's .Renviron (or set the
+# option in its startup). Practice copies launched with run_tutorial() never
+# see it, so they default to FALSE.
+#
+# WHY THE PRACTICE BRANCH SHOWS A VISIBLE BANNER RATHER THAN NOTHING: if this
+# flag is ever missing on a deployed graded app, the ID box disappears and
+# nothing logs -- every student silently scores zero. A banner makes a
+# misconfigured deploy announce itself on the first screen instead of three
+# weeks later in the response sheet.
+bx_is_graded <- function() {
+  isTRUE(getOption(
+    "BisonExplorR.graded",
+    identical(tolower(Sys.getenv("BISONEXPLORR_GRADED")), "true")
+  ))
+}
+
+log_attempt <- function(student_id, exercise_id, correct) {
+  # Practice copies do not log. Without this, practice attempts POST with
+  # student_id = "unknown" and fill the response sheet with orphan rows
+  # that look like a bug in grade_module().
+  if (!bx_is_graded()) return(invisible(NULL))
+
+  tryCatch({
+    httr::POST(
+      url = "https://docs.google.com/forms/d/e/1FAIpQLSfmm3cUcoaWWYBb0zk7rbowSpgUL13nQc-Dxn7K8zQ30GdykA/formResponse",
+      body = list(
+        "entry.1413675438" = as.character(Sys.time()),
+        "entry.1257984687" = as.character(student_id %||% "unknown"),
+        "entry.1315894547" = "module4",   # tutorial_id for this module
+        "entry.1172625272" = as.character(exercise_id %||% "unknown"),
+        "entry.1835356043" = as.character(correct %||% "NA")
+      ),
+      encode = "form"
+    )
+  }, error = function(e) message("Logging failed: ", e$message))
+}
+
+# Package dataset — always available to every exercise
+mammals <- read.csv(system.file("extdata", "mammals_data.csv", package = "BisonExplorR"))
+```
+
+```{r event-setup, context="server-start"}
+event_register_handler("exercise_result", function(session, event, data) {
+  log_attempt(
+    student_id  = bx_get_sid(session),
+    exercise_id = data$label,
+    correct     = data$feedback$correct
+  )
+})
+```
+
+```{r coach-server, context="server"}
+# One coach_server() per coached exercise. The third argument must match a
+# key in the server-side exercise_registry.R ("moduleN-qM", HYPHENATED) --
+# an unknown key does not error, it silently returns generic context.
+# The Shiny id must match the coach_ui() call below it, or the card renders
+# and never responds.
+BisonExplorR::coach_server("coach_q5", shiny::reactive(learnr::get_tutorial_state("q5")), "module4-q5")
+BisonExplorR::coach_server("coach_q10", shiny::reactive(learnr::get_tutorial_state("q10")), "module4-q10")
+```
+
+## Before you start
+
+```{r student-id, echo=FALSE}
+uiOutput("sid_ui")
+```
+
+```{r sid-server, context="server"}
+# The ID box exists ONLY in the graded deployment. See bx_is_graded() in setup.
+output$sid_ui <- renderUI({
+  if (!bx_is_graded()) {
+    return(shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #C05621; background:#FDF6EC;"),
+      shiny::strong("Practice mode."),
+      " Nothing here is recorded and this copy does not count for credit.",
+      " To do this module for credit, run ",
+      shiny::tags$code('launch_graded_tutorial("module4")'),
+      " instead."
+    ))
+  }
+  shiny::tagList(
+    shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #1F3864; background:#F2F4F7;"),
+      shiny::strong("Graded copy."),
+      " Your work on this module is recorded, so enter your student ID before",
+      " you begin. Use the same ID every time \u2014 a different ID reads as a",
+      " different student and your work will not be combined."
+    ),
+    shiny::textInput("sid",
+      "Student ID (the same one you used in Module 1):", value = ""),
+    shiny::div(id = "sid_warn",
+      style = "color:#C05621; font-weight:600; margin:-6px 0 8px 0;",
+      "Enter your ID to continue."),
+    # Client-side gate on the section's Continue button. This prevents the
+    # ACCIDENTAL case (a student who forgets), not a determined one -- anyone
+    # with devtools can re-enable the button. The real protection against
+    # unattributed rows is that grade_module() drops blank IDs.
+    shiny::tags$script(shiny::HTML("
+      (function () {
+        function apply() {
+          var sid = document.getElementById('sid');
+          if (!sid) return;
+          var sec = sid.closest('.section');
+          if (!sec) return;
+          var btns = sec.querySelectorAll('.topicActions button, .continueButton');
+          var ok = sid.value.trim().length > 0;
+          btns.forEach(function (b) {
+            b.disabled = !ok;
+            b.style.opacity = ok ? '' : '0.45';
+            b.style.cursor  = ok ? '' : 'not-allowed';
+          });
+          var w = document.getElementById('sid_warn');
+          if (w) w.style.display = ok ? 'none' : 'block';
+        }
+        document.addEventListener('input', function (e) {
+          if (e.target && e.target.id === 'sid') apply();
+        });
+        // learnr renders sections progressively, so the Continue button may not
+        // exist yet when this script first runs.
+        new MutationObserver(apply)
+          .observe(document.body, { childList: true, subtree: true });
+        apply();
+      })();
+    "))
+  )
+})
+
+# Cache the ID on userData as a second, independent path to it. bx_get_sid()
+# checks rootScope() first and falls back to this.
+shiny::observeEvent(input$sid, {
+  if (!is.null(input$sid) && nzchar(input$sid)) {
+    session$userData$bx_sid <- input$sid
+  }
+}, ignoreInit = TRUE)
+```
+
+Work through each section in order — a **Continue** button appears once you answer correctly.
+
+In Module 1 you imported the soil dataset and learned to inspect it with `head()`, `str()`, and
+`summary()`. This module picks up right there: now that you can *load* a dataset, you'll learn to
+*reshape* it and *plot* it — the two skills you'll use in almost every 204 lab.
+
+We'll work with `mammals`, a dataset of 29 species with their body mass, resting heart rate, and
+taxonomic group. It's already loaded for you.
+
+```{r peek, echo=TRUE}
+head(mammals)
+```
+
+By the end of this module you should be able to:
+
+- Chain steps together with the pipe, `%>%`
+- Use `filter()`, `select()`, `mutate()`, `group_by()`, and `summarise()`
+- Calculate a standard error and add SE bars to a figure
+- Build scatter plots, boxplots, and bar charts with `ggplot2`
+
+---
+
+## The pipe: `%>%`
+
+Almost every wrangling step in R can be written as: *take a dataset, do something to it.* The
+**pipe** `%>%` lets you chain those steps left to right, like reading a recipe:
+
+```
+mammals %>%        # start with the mammals data
+  filter(...) %>%   # then keep some rows
+  summarise(...)    # then summarise what's left
+```
+
+Read `%>%` as the word **"then."** Whatever is on the left is handed to the function on the right
+as its first argument. You'll use it in every exercise below.
+
+---
+
+## `filter()` — keep the rows you want
+
+`filter()` keeps only the rows that meet a condition. Conditions use comparisons like `==` (equal
+to), `>`, `<`, and `!=` (not equal to).
+
+### Your turn
+
+Keep only the rows where `group` is `"Rodent"`. (Note the double `==` and the quotes around text.)
+
+```{r q1, exercise=TRUE}
+# Keep only the rows where group is "Rodent".
+mammals %>%
+  filter()
+```
+
+```{r q1-check}
+grade_this({
+  correct <- mammals %>% filter(group == "Rodent")
+  if (isTRUE(all.equal(.result, correct, check.attributes = FALSE))) {
+    pass("Nice — eight rodent rows, everything else dropped.")
+  }
+  fail('Not quite. Inside filter(), write the condition group == "Rodent".')
+})
+```
+
+---
+
+## `select()` — keep the columns you want
+
+Where `filter()` chooses **rows**, `select()` chooses **columns**. List the columns you want to
+keep, separated by commas.
+
+### Your turn
+
+Keep just two columns: `species` and `heart_rate_bpm`, in that order.
+
+```{r q2, exercise=TRUE}
+# Keep only the species and heart_rate_bpm columns.
+mammals %>%
+  select()
+```
+
+```{r q2-check}
+grade_this({
+  correct <- mammals %>% select(species, heart_rate_bpm)
+  if (isTRUE(all.equal(.result, correct, check.attributes = FALSE))) {
+    pass("Two columns, in the order you asked for.")
+  }
+  fail("Not quite. Select species and heart_rate_bpm.")
+})
+```
+
+---
+
+## `mutate()` — add or change a column
+
+`mutate()` creates a new column (or overwrites an existing one) from the columns you already have.
+The rest of the dataset comes along unchanged.
+
+### Your turn
+
+Body mass is stored in kilograms. Add a new column called `body_mass_g` that expresses it in
+**grams** (there are 1000 grams in a kilogram).
+
+```{r q3, exercise=TRUE}
+# Add a column body_mass_g equal to body_mass_kg * 1000.
+mammals %>%
+  mutate()
+```
+
+```{r q3-check}
+grade_this({
+  correct <- mammals %>% mutate(body_mass_g = body_mass_kg * 1000)
+  if (isTRUE(all.equal(.result, correct, check.attributes = FALSE))) {
+    pass("Grams now sit right alongside kilograms.")
+  }
+  fail("Not quite. Add body_mass_g = body_mass_kg * 1000 inside mutate().")
+})
+```
+
+---
+
+## `group_by()` + `summarise()` — collapse to group summaries
+
+This pair is the workhorse of data analysis. `group_by()` splits the data into groups; `summarise()`
+then computes one value per group. Together they turn 29 rows of mammals into one row per `group`.
+
+### Your turn
+
+Find the **mean heart rate for each group**. Call the summary column `mean_hr`.
+
+```{r q4, exercise=TRUE}
+# For each group, calculate the mean of heart_rate_bpm. Call it mean_hr.
+mammals %>%
+  group_by(group) %>%
+  summarise()
+```
+
+```{r q4-check}
+grade_this({
+  correct <- mammals %>%
+    group_by(group) %>%
+    summarise(mean_hr = mean(heart_rate_bpm))
+  if (isTRUE(all.equal(as.data.frame(.result), as.data.frame(correct), check.attributes = FALSE))) {
+    pass("Four groups, four means — rodents fastest, ungulates slowest.")
+  }
+  fail("Not quite. Inside summarise(), write mean_hr = mean(heart_rate_bpm).")
+})
+```
+
+---
+
+## Standard error — how precise is that mean?
+
+A group mean is only an estimate. The **standard error (SE)** tells you how far that estimate is
+likely to sit from the true mean. It's the standard deviation divided by the square root of the
+sample size:
+
+$$ SE = \frac{sd}{\sqrt{n}} $$
+
+In R, use `sd(x)` for the standard deviation and `length(x)` for the sample size *n*. (Use
+`length()`, not `n()` — this is the convention we use across all of 204.)
+
+### Your turn
+
+Keep the `mean_hr` column from before, and **add a second column** `se_hr` for the standard error
+of `heart_rate_bpm`.
+
+```{r q5, exercise=TRUE}
+# Add a second summary column, se_hr, for the standard error of heart_rate_bpm.
+# SE = sd(x) / sqrt(length(x)).  Use length(), not n().
+mammals %>%
+  group_by(group) %>%
+  summarise(mean_hr = mean(heart_rate_bpm))
+```
+
+```{r q5-check}
+grade_this({
+  correct <- mammals %>%
+    group_by(group) %>%
+    summarise(mean_hr = mean(heart_rate_bpm),
+              se_hr   = sd(heart_rate_bpm) / sqrt(length(heart_rate_bpm)))
+  if (isTRUE(all.equal(as.data.frame(.result), as.data.frame(correct), check.attributes = FALSE))) {
+    pass("That se_hr column is exactly what your error bars will come from later.")
+  }
+  fail("Not quite. Add se_hr = sd(heart_rate_bpm) / sqrt(length(heart_rate_bpm)).")
+})
+```
+
+```{r coach-ui-q5, echo=FALSE}
+BisonExplorR::coach_ui("coach_q5", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+---
+
+## Visualizing with `ggplot2`
+
+Every `ggplot` is built from three pieces:
+
+1. `ggplot(data, aes(x = ..., y = ...))` — the data and which columns map to which axes
+2. a **geom** layer added with `+` — `geom_point()`, `geom_boxplot()`, `geom_col()`, ...
+3. optional styling — axis labels with `labs()`, a clean look with `theme_classic()`
+
+A quick note on the x-axis below: body mass runs from a 21-gram mouse to a 4-tonne elephant, so we
+plot `log_mass` (the base-10 log of body mass, already in the dataset). Logging spreads those points
+out instead of crushing them all against zero.
+
+### Your turn: a scatter plot
+
+Finish this scatter of `log_mass` (x) against `heart_rate_bpm` (y) by adding `geom_point()` with `+`.
+
+```{r q6, exercise=TRUE}
+# Add geom_point() to draw the points.
+ggplot(mammals, aes(x = log_mass, y = heart_rate_bpm))
+```
+
+```{r q6-check}
+grade_this({
+  if (!inherits(.result, "ggplot")) {
+    fail("That isn't a plot yet — start from the ggplot() line and add a geom with +.")
+  }
+  geoms <- vapply(.result$layers, function(l) class(l$geom)[1], character(1))
+  if ("GeomPoint" %in% geoms) {
+    pass("A clear downward trend: bigger mammals beat slower. That's allometry.")
+  }
+  fail("Add + geom_point() to draw the points.")
+})
+```
+
+### A boxplot by group
+
+`geom_boxplot()` compares a numeric variable across categories. Put `group` on x and
+`heart_rate_bpm` on y, then add the boxplot geom.
+
+```{r q7, exercise=TRUE}
+# Add geom_boxplot() to compare heart rate across groups.
+ggplot(mammals, aes(x = group, y = heart_rate_bpm))
+```
+
+```{r q7-check}
+grade_this({
+  if (!inherits(.result, "ggplot")) {
+    fail("Start from the ggplot() line and add + geom_boxplot().")
+  }
+  geoms <- vapply(.result$layers, function(l) class(l$geom)[1], character(1))
+  if ("GeomBoxplot" %in% geoms) {
+    pass("One box per group — the spread of rodent heart rates dwarfs the others.")
+  }
+  fail("Add + geom_boxplot().")
+})
+```
+
+### A bar chart with SE bars
+
+This is the figure you'll build again and again in the Daphnia and cardiovascular labs: a bar for
+each group mean, with error bars showing the standard error. The summary table is built for you —
+add `geom_col()` for the bars, then `geom_errorbar()` for the SE.
+
+```{r q8, exercise=TRUE}
+# The summary table (mean and SE per group) is ready:
+hr_summary <- mammals %>%
+  group_by(group) %>%
+  summarise(mean_hr = mean(heart_rate_bpm),
+            se_hr   = sd(heart_rate_bpm) / sqrt(length(heart_rate_bpm)))
+
+# Add geom_col() for the bars, then geom_errorbar() with
+#   ymin = mean_hr - se_hr  and  ymax = mean_hr + se_hr.
+ggplot(hr_summary, aes(x = group, y = mean_hr)) +
+  labs(x = "Group", y = "Mean heart rate (bpm)") +
+  theme_classic()
+```
+
+```{r q8-check}
+grade_this({
+  if (!inherits(.result, "ggplot")) {
+    fail("Start from the ggplot() line provided and add the bar and error-bar layers.")
+  }
+  geoms   <- vapply(.result$layers, function(l) class(l$geom)[1], character(1))
+  has_bar <- any(c("GeomCol", "GeomBar") %in% geoms)
+  has_err <- "GeomErrorbar" %in% geoms
+  if (has_bar && has_err) {
+    pass("Bars for the means, whiskers for the SE — labeled axes, clean theme. That's a lab-ready figure.")
+  }
+  if (has_bar && !has_err) {
+    fail("Bars are there. Now add geom_errorbar(aes(ymin = mean_hr - se_hr, ymax = mean_hr + se_hr), width = 0.2).")
+  }
+  fail("Add geom_col() for the bars (then geom_errorbar() for the SE).")
+})
+```
+
+### Small multiples with `facet_wrap()`
+
+`facet_wrap()` splits one plot into a panel per group. Add `+ facet_wrap(~ group)` to the scatter
+below.
+
+```{r q9, exercise=TRUE}
+# Split the scatter into one panel per group with facet_wrap(~ group).
+ggplot(mammals, aes(x = log_mass, y = heart_rate_bpm)) +
+  geom_point() +
+  labs(x = "log10 body mass (kg)", y = "Heart rate (bpm)") +
+  theme_classic()
+```
+
+```{r q9-check}
+grade_this({
+  if (!inherits(.result, "ggplot")) {
+    fail("Start from the scatter plot and add + facet_wrap(~ group).")
+  }
+  if (inherits(.result$facet, "FacetWrap")) {
+    pass("Four panels — the mass–heart-rate trend holds within each group, not just across them.")
+  }
+  fail("Add + facet_wrap(~ group) to split the plot into one panel per group.")
+})
+```
+
+### A trend line with its equation and R²
+
+A scatter *shows* a relationship; a fitted line *summarizes* it. `geom_smooth(method = "lm")` adds the
+least-squares regression line. Two `ggpubr` layers print the numbers right on the figure:
+`stat_regline_equation()` writes the line's equation, and `stat_cor(aes(label = ..rr.label..))` writes
+its R² — the fraction of the variation the line explains. This is exactly the regression figure you'll
+build for the algae experiment, and it's on R Exam 1.
+
+Add three layers to the scatter below: `geom_smooth(method = "lm")`, then `stat_regline_equation()`,
+then `stat_cor(aes(label = ..rr.label..))`.
+
+```{r q10, exercise=TRUE}
+# Heart rate falls as body size rises. Add the fitted line and its stats:
+#   + geom_smooth(method = "lm")
+#   + stat_regline_equation()
+#   + stat_cor(aes(label = ..rr.label..))
+ggplot(mammals, aes(x = log_mass, y = heart_rate_bpm)) +
+  geom_point() +
+  labs(x = "log10 body mass (kg)", y = "Heart rate (bpm)") +
+  theme_classic()
+```
+
+```{r q10-check}
+grade_this({
+  if (!inherits(.result, "ggplot")) {
+    fail('Start from the scatter and add + geom_smooth(method = "lm").')
+  }
+  geoms <- vapply(.result$layers, function(l) class(l$geom)[1], character(1))
+  if (any(c("GeomSmooth", "GeomLine") %in% geoms)) {
+    pass("There's the trend line with its equation and R² — a complete regression figure.")
+  }
+  fail('Add + geom_smooth(method = "lm") to draw the fitted line.')
+})
+```
+
+```{r coach-ui-q10, echo=FALSE}
+BisonExplorR::coach_ui("coach_q10", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+### Saving a figure with `ggsave()`
+
+To hand a figure in, you save it to a file. `ggsave()` writes a plot to an image — give it a filename
+ending in `.png`, the plot object, and a size. On both R exams you'll save each figure this way and
+upload it, so make the pattern automatic now.
+
+The finished regression figure is stored in `p`. Save it as `"mass_hr.png"` with
+`ggsave("mass_hr.png", p, width = 16, height = 10, units = "cm")`.
+
+```{r q11, exercise=TRUE}
+p <- ggplot(mammals, aes(x = log_mass, y = heart_rate_bpm)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "log10 body mass (kg)", y = "Heart rate (bpm)") +
+  theme_classic()
+
+# Add one line: save p as "mass_hr.png" with ggsave(), width = 16,
+# height = 10, units = "cm".
+
+```
+
+```{r q11-check}
+grade_this({
+  code <- paste(.user_code, collapse = "\n")
+  if (!grepl("ggsave", code)) {
+    fail("Use ggsave() to save the figure to a file.")
+  }
+  if (!grepl("\\.png", code)) {
+    fail('Give ggsave() a filename ending in .png, like "mass_hr.png".')
+  }
+  pass("Saved — a .png like that is what you'd upload on exam day.")
+})
+```
+
+---
+
+## You made it
+
+In this module you learned to:
+
+- chain steps with `%>%`
+- reshape data with `filter()`, `select()`, `mutate()`, `group_by()`, and `summarise()`
+- compute a standard error and turn it into error bars
+- build scatter plots, boxplots, faceted plots, and SE bar charts in `ggplot2`
+- add a fitted regression line with its equation and R², and save a figure with `ggsave()`
+
+*(Combining two separate tables — joining — comes later, in the cardio unit, once you have data
+that actually arrives in more than one file.)*
+
+Next up is **Module 5**, where these figures meet statistics: choosing and running the right test,
+then interpreting what it tells you. Everything you wrangled and plotted here is the foundation for
+that.

@@ -1,0 +1,500 @@
+---
+title: "Module 10: Joining Data — Combining Tables"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: >
+  Real data often arrives in more than one table. Learn the two ways to combine
+  tables — stacking (bind_rows / bind_cols) and matching on a key (the joins) —
+  and how left, inner, full, and right joins differ.
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(shiny)
+library(BisonExplorR)   # coach_ui() / coach_server()
+library(gradethis)
+library(dplyr)
+library(httr)
+
+gradethis_setup()
+tutorial_options(
+  exercise.checker = gradethis::grade_learnr,
+  exercise.completion = TRUE
+)
+knitr::opts_chunk$set(echo = FALSE)
+
+`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
+
+# Resolve the student ID no matter which session scope a handler receives.
+# VERIFIED 2026-07-25 (learnr 0.11.6): question() blocks are Shiny MODULES, so
+# a question_submission handler gets a NAMESPACED session whose input$sid is
+# EMPTY. The ID lives on the root session. This fails silently -- rows land in
+# the sheet looking well-formed but unattributable, grade_module() drops them,
+# and the student loses that score with no warning anywhere. Do not "simplify"
+# this back to session$input$sid.
+bx_get_sid <- function(session) {
+  usable <- function(x) !is.null(x) && length(x) > 0 && nzchar(as.character(x)[1])
+  sid <- tryCatch(session$rootScope()$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$userData$bx_sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  NULL   # log_attempt()'s %||% turns this into "unknown"
+}
+
+# Is this the GRADED deployment or a practice copy?
+# Set BISONEXPLORR_GRADED=true in the deployed app's .Renviron (or set the
+# option in its startup). Practice copies launched with run_tutorial() never
+# see it, so they default to FALSE.
+#
+# WHY THE PRACTICE BRANCH SHOWS A VISIBLE BANNER RATHER THAN NOTHING: if this
+# flag is ever missing on a deployed graded app, the ID box disappears and
+# nothing logs -- every student silently scores zero. A banner makes a
+# misconfigured deploy announce itself on the first screen instead of three
+# weeks later in the response sheet.
+bx_is_graded <- function() {
+  isTRUE(getOption(
+    "BisonExplorR.graded",
+    identical(tolower(Sys.getenv("BISONEXPLORR_GRADED")), "true")
+  ))
+}
+
+log_attempt <- function(student_id, exercise_id, correct) {
+  # Practice copies do not log. Without this, practice attempts POST with
+  # student_id = "unknown" and fill the response sheet with orphan rows
+  # that look like a bug in grade_module().
+  if (!bx_is_graded()) return(invisible(NULL))
+
+  tryCatch({
+    httr::POST(
+      url = "https://docs.google.com/forms/d/e/1FAIpQLSfmm3cUcoaWWYBb0zk7rbowSpgUL13nQc-Dxn7K8zQ30GdykA/formResponse",
+      body = list(
+        "entry.1413675438" = as.character(Sys.time()),
+        "entry.1257984687" = as.character(student_id %||% "unknown"),
+        "entry.1315894547" = "module10",
+        "entry.1172625272" = as.character(exercise_id %||% "unknown"),
+        "entry.1835356043" = as.character(correct %||% "NA")
+      ),
+      encode = "form"
+    )
+  }, error = function(e) message("Logging failed: ", e$message))
+}
+
+# ---- Shared teaching tables (small on purpose so you can see every row) -----
+# One row per field site:
+sites <- data.frame(
+  site_id = c("P1", "P2", "P3", "P4"),
+  habitat = c("forest", "forest", "meadow", "wetland"),
+  stringsAsFactors = FALSE
+)
+
+# Frog counts, but NOT every site was surveyed, and one survey (P5) is from a
+# site that isn't in `sites` at all:
+surveys <- data.frame(
+  site_id   = c("P1", "P2", "P3", "P5"),
+  species   = c("wood frog", "wood frog", "wood frog", "wood frog"),
+  abundance = c(12, 8, 3, 5),
+  stringsAsFactors = FALSE
+)
+
+# Two survey rounds with the SAME columns (for stacking):
+spring <- data.frame(site_id = c("P1", "P2", "P3"), abundance = c(12, 8, 3),
+                     stringsAsFactors = FALSE)
+fall   <- data.frame(site_id = c("P1", "P2", "P3"), abundance = c(15, 6, 4),
+                     stringsAsFactors = FALSE)
+
+# GPS coordinates for the four sites, in the SAME ORDER as `sites` (for gluing
+# columns side by side). Notice there is no site_id column here:
+coords <- data.frame(lat = c(40.95, 40.96, 40.94, 40.97),
+                     lon = c(-76.88, -76.89, -76.87, -76.90),
+                     stringsAsFactors = FALSE)
+```
+
+```{r event-setup, context="server-start"}
+event_register_handler("exercise_result", function(session, event, data) {
+  log_attempt(
+    student_id  = bx_get_sid(session),
+    exercise_id = data$label,
+    correct     = data$feedback$correct
+  )
+})
+```
+
+```{r coach-server, context="server"}
+# One coach_server() per coached exercise. The third argument must match a
+# key in the server-side exercise_registry.R ("moduleN-qM", HYPHENATED) --
+# an unknown key does not error, it silently returns generic context.
+# The Shiny id must match the coach_ui() call below it, or the card renders
+# and never responds.
+BisonExplorR::coach_server("coach_q1", shiny::reactive(learnr::get_tutorial_state("q1")), "module10-q1")
+BisonExplorR::coach_server("coach_q4", shiny::reactive(learnr::get_tutorial_state("q4")), "module10-q4")
+```
+
+## Before you begin
+
+```{r student-id, echo=FALSE}
+uiOutput("sid_ui")
+```
+
+```{r sid-server, context="server"}
+# The ID box exists ONLY in the graded deployment. See bx_is_graded() in setup.
+output$sid_ui <- renderUI({
+  if (!bx_is_graded()) {
+    return(shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #C05621; background:#FDF6EC;"),
+      shiny::strong("Practice mode."),
+      " Nothing here is recorded and this copy does not count for credit.",
+      " To do this module for credit, run ",
+      shiny::tags$code('launch_graded_tutorial("module10")'),
+      " instead."
+    ))
+  }
+  shiny::tagList(
+    shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #1F3864; background:#F2F4F7;"),
+      shiny::strong("Graded copy."),
+      " Your work on this module is recorded, so enter your student ID before",
+      " you begin. Use the same ID every time \u2014 a different ID reads as a",
+      " different student and your work will not be combined."
+    ),
+    shiny::textInput("sid",
+      "Student ID (the same one you used in Module 1):", value = ""),
+    shiny::div(id = "sid_warn",
+      style = "color:#C05621; font-weight:600; margin:-6px 0 8px 0;",
+      "Enter your ID to continue."),
+    # Client-side gate on the section's Continue button. This prevents the
+    # ACCIDENTAL case (a student who forgets), not a determined one -- anyone
+    # with devtools can re-enable the button. The real protection against
+    # unattributed rows is that grade_module() drops blank IDs.
+    shiny::tags$script(shiny::HTML("
+      (function () {
+        function apply() {
+          var sid = document.getElementById('sid');
+          if (!sid) return;
+          var sec = sid.closest('.section');
+          if (!sec) return;
+          var btns = sec.querySelectorAll('.topicActions button, .continueButton');
+          var ok = sid.value.trim().length > 0;
+          btns.forEach(function (b) {
+            b.disabled = !ok;
+            b.style.opacity = ok ? '' : '0.45';
+            b.style.cursor  = ok ? '' : 'not-allowed';
+          });
+          var w = document.getElementById('sid_warn');
+          if (w) w.style.display = ok ? 'none' : 'block';
+        }
+        document.addEventListener('input', function (e) {
+          if (e.target && e.target.id === 'sid') apply();
+        });
+        // learnr renders sections progressively, so the Continue button may not
+        // exist yet when this script first runs.
+        new MutationObserver(apply)
+          .observe(document.body, { childList: true, subtree: true });
+        apply();
+      })();
+    "))
+  )
+})
+
+# Cache the ID on userData as a second, independent path to it. bx_get_sid()
+# checks rootScope() first and falls back to this.
+shiny::observeEvent(input$sid, {
+  if (!is.null(input$sid) && nzchar(input$sid)) {
+    session$userData$bx_sid <- input$sid
+  }
+}, ignoreInit = TRUE)
+```
+
+
+## Why tables come apart
+
+In the field you rarely record everything in one sheet. You keep a **site list**
+(where the sites are, what habitat they're in) separate from your **survey
+data** (what you counted, and when). That's good practice — but eventually you
+need them back together.
+
+There are two fundamentally different ways to combine tables, and telling them
+apart is the whole game:
+
+| You want to… | Tables share… | Tool |
+|---|---|---|
+| **stack** tables on top of each other (more rows) | the same columns | `bind_rows()` |
+| **glue** tables side by side (more columns) | the same rows, in order | `bind_cols()` |
+| **match** rows by a shared key | a key column (e.g. `site_id`) | a **join** |
+
+Meet our two tables. Run these and look at them:
+
+```{r peek-sites, exercise=TRUE}
+sites
+```
+
+```{r peek-surveys, exercise=TRUE}
+surveys
+```
+
+Notice the mismatch — it will matter a lot in a minute. **`sites`** lists P1–P4.
+**`surveys`** has P1, P2, P3, and **P5**. So **P4 was never surveyed**, and **P5
+was surveyed but isn't in your site list**.
+
+## Stacking rows: `bind_rows()`
+
+When two tables describe the *same kind of thing* with the *same columns* — like
+two rounds of the same survey — you stack them into one longer table with
+`bind_rows()`. It lines columns up **by name**, so the column order doesn't have
+to match.
+
+Worked example — one spring round and one fall round:
+
+```{r bindrows-demo, exercise=TRUE}
+spring
+fall
+```
+
+`bind_rows()` can add an `.id` column to record which table each row came from —
+handy for keeping the seasons straight:
+
+```{r bindrows-demo2, exercise=TRUE}
+bind_rows(spring = spring, fall = fall, .id = "season")
+```
+
+### Your turn
+
+```{r q1, exercise=TRUE}
+# Stack `spring` and `fall` into one table (no .id needed here).
+bind_rows()
+```
+
+```{r q1-check}
+grade_this({
+  correct <- bind_rows(spring, fall)
+  if (isTRUE(all.equal(as.data.frame(.result), as.data.frame(correct),
+                       check.attributes = FALSE))) {
+    pass("Six rows — the three spring plus the three fall. Stacking keeps every row.")
+  }
+  fail("Not quite. Pass both tables to bind_rows(): bind_rows(spring, fall).")
+})
+```
+
+```{r coach-ui-q1, echo=FALSE}
+BisonExplorR::coach_ui("coach_q1", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+## Gluing columns: `bind_cols()`
+
+`bind_cols()` sets tables **side by side**. It does **not** look at any key — it
+matches rows purely by **position**: row 1 with row 1, row 2 with row 2, and so
+on. That makes it powerful but dangerous.
+
+Here `coords` has GPS points listed in the same order as `sites`:
+
+```{r bindcols-demo, exercise=TRUE}
+bind_cols(sites, coords)
+```
+
+```{r bindcols-safety, echo=FALSE}
+question(
+  "What happens if `coords` were sorted in a DIFFERENT order than `sites`?",
+  answer("Every site would get the wrong coordinates, with no warning.",
+         correct = TRUE,
+         message = "Right — bind_cols() trusts row order blindly. When a shared key exists, a join is safer."),
+  answer("R would automatically match them by site_id.",
+         message = "No — bind_cols() ignores keys entirely. It only sees row position."),
+  answer("R would throw an error.",
+         message = "Only if the row COUNTS differ. Same count but wrong order fails silently."),
+  allow_retry = TRUE
+)
+```
+
+The lesson: reach for `bind_cols()` only when you're certain the rows line up.
+Whenever the tables share a key column, use a **join** instead — that's next.
+
+## Matching on a key: the joins
+
+A **join** combines two tables by matching a shared **key** — here, `site_id`.
+The four joins differ in **one thing only**: *which rows do you keep when a key
+appears in one table but not the other?*
+
+Keep this map in view:
+
+| Join | Keeps… | Rows here |
+|---|---|---|
+| `inner_join(x, y)` | only keys in **both** tables | P1, P2, P3 |
+| `left_join(x, y)`  | **all of `x`**, matched where possible | P1, P2, P3, P4 |
+| `right_join(x, y)` | **all of `y`**, matched where possible | P1, P2, P3, P5 |
+| `full_join(x, y)`  | **everything** from both | P1, P2, P3, P4, P5 |
+
+**Course convention:** always name the key explicitly with `by = "..."`. It makes
+your intent clear and guards against joining on the wrong column by accident.
+
+### `left_join()` — keep all of the left table
+
+This is the workhorse. "Start from `sites`, and attach survey data where it
+exists." Sites with no survey (P4) are **kept**, with `NA` in the survey columns.
+
+```{r q2, exercise=TRUE}
+# Attach the survey data to every site. Fill in the key column name.
+sites %>%
+  left_join(surveys, by = "____")
+```
+
+```{r q2-check}
+grade_this({
+  correct <- left_join(sites, surveys, by = "site_id")
+  if (isTRUE(all.equal(as.data.frame(.result), as.data.frame(correct),
+                       check.attributes = FALSE))) {
+    pass("Four rows — all of `sites`. Look at P4: it stayed, but its survey columns are NA because it was never surveyed.")
+  }
+  fail('Not quite. The shared key is "site_id": left_join(surveys, by = "site_id").')
+})
+```
+
+### `inner_join()` — keep only matches
+
+"Only sites that were actually surveyed." P4 (no survey) and P5 (no site record)
+both **drop out**.
+
+```{r q3, exercise=TRUE}
+# Keep only sites that appear in BOTH tables.
+sites %>%
+  inner_join(surveys, by = "____")
+```
+
+```{r q3-check}
+grade_this({
+  correct <- inner_join(sites, surveys, by = "site_id")
+  if (isTRUE(all.equal(as.data.frame(.result), as.data.frame(correct),
+                       check.attributes = FALSE))) {
+    pass("Three rows — P1, P2, P3. An inner join keeps only keys present in both tables.")
+  }
+  fail('Not quite. Use inner_join(surveys, by = "site_id"). You should get three rows.')
+})
+```
+
+### `full_join()` — keep everything
+
+"Show me every site AND every survey, matched where possible." Nothing is lost —
+P4 (no survey) and P5 (no site) both appear, each with `NA` where the other table
+had nothing.
+
+```{r q4, exercise=TRUE}
+# Keep every row from both tables.
+sites %>%
+  full_join(surveys, by = "____")
+```
+
+```{r q4-check}
+grade_this({
+  correct <- full_join(sites, surveys, by = "site_id")
+  if (isTRUE(all.equal(as.data.frame(.result), as.data.frame(correct),
+                       check.attributes = FALSE))) {
+    pass("Five rows — the union of both tables. P4 has NA survey data; P5 has NA habitat.")
+  }
+  fail('Not quite. Use full_join(surveys, by = "site_id"). You should get five rows.')
+})
+```
+
+```{r coach-ui-q4, echo=FALSE}
+BisonExplorR::coach_ui("coach_q4", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+### `right_join()` — the mirror image
+
+`right_join(x, y)` keeps all of **`y`**. It's just `left_join()` with the tables
+swapped, so most people pick one and stick with `left_join()`. Run this to see
+that P5 (survey with no site) is the one that's kept, and P4 drops:
+
+```{r rightjoin-demo, exercise=TRUE}
+right_join(sites, surveys, by = "site_id")
+```
+
+## Keeping or dropping rows: filtering joins
+
+The joins above **add columns** from the other table. Two special joins add
+**no columns at all** — they only use the second table to decide which rows of
+the first to keep. They're perfect for asking "which of my sites *do* / *don't*
+have survey data?"
+
+- `semi_join(x, y)` — keep rows of `x` that **have** a match in `y`.
+- `anti_join(x, y)` — keep rows of `x` that have **no** match in `y`.
+
+```{r semijoin-demo, exercise=TRUE}
+# Sites that WERE surveyed (columns of `sites` only — nothing added):
+semi_join(sites, surveys, by = "site_id")
+```
+
+### Your turn
+
+```{r q5, exercise=TRUE}
+# Find the site(s) that were NEVER surveyed — rows of `sites` with no match.
+anti_join(sites, surveys, by = "____")
+```
+
+```{r q5-check}
+grade_this({
+  correct <- anti_join(sites, surveys, by = "site_id")
+  if (isTRUE(all.equal(as.data.frame(.result), as.data.frame(correct),
+                       check.attributes = FALSE))) {
+    pass("Just P4 — the wetland site that was never surveyed. anti_join() is the fastest way to find gaps in your data.")
+  }
+  fail('Not quite. Use anti_join(surveys, by = "site_id"). One row (P4) should remain.')
+})
+```
+
+## Which combine do I reach for?
+
+```{r decide, echo=FALSE}
+question(
+  "You have a `sites` table and a `surveys` table sharing `site_id`. You want ONE table with every site listed, plus its survey counts where they exist, and blanks where a site wasn't surveyed. Which tool?",
+  answer("left_join(sites, surveys, by = \"site_id\")", correct = TRUE,
+         message = "Yes — you want all of the left table (sites) with survey data attached where available."),
+  answer("bind_rows(sites, surveys)",
+         message = "bind_rows() stacks rows and needs matching columns; these tables have different columns and a shared key, so it's a join."),
+  answer("inner_join(sites, surveys, by = \"site_id\")",
+         message = "Inner join would DROP unsurveyed sites — but you said you want every site listed."),
+  answer("bind_cols(sites, surveys)",
+         message = "bind_cols() matches by position and ignores site_id; the tables don't even have the same rows."),
+  allow_retry = TRUE
+)
+```
+
+```{r decide2, echo=FALSE}
+question(
+  "You ran the same survey protocol in two years and each year's data is in its own table with identical columns. You want one long table for analysis. Which tool?",
+  answer("bind_rows()", correct = TRUE,
+         message = "Right — same columns, you just want more rows. Add an .id column to remember which year."),
+  answer("full_join()",
+         message = "A join matches on a key; here you simply want to stack identical-shaped tables."),
+  answer("bind_cols()",
+         message = "That would set the years side by side as extra columns, not stack them into more rows."),
+  allow_retry = TRUE
+)
+```
+
+## Where you landed
+
+You can now combine tables two ways and choose between them:
+
+- **Stack** with `bind_rows()` (more rows, same columns) — line up by name.
+- **Glue** with `bind_cols()` (more columns, same rows) — matched by position, so
+  only when you're sure the order is identical.
+- **Join** on a key when tables share an ID column:
+  - `left_join()` keeps all of the left table (the everyday default),
+  - `inner_join()` keeps only matches,
+  - `full_join()` keeps everything,
+  - `right_join()` keeps all of the right table.
+- **Filtering joins** `semi_join()` / `anti_join()` keep or drop left rows by
+  whether they match — great for finding the gaps in your data.
+
+Always write the key explicitly: `by = "site_id"`. In the cardio unit you'll use
+`left_join()` to attach subject information to heart-rate measurements — the same
+move you practiced here.

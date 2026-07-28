@@ -1,0 +1,589 @@
+---
+title: "Module 6: Linear Regression — Fitting a Line"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: >
+  When your predictor is a measured number rather than a group, you fit a line.
+  Build a linear model with lm(), read the slope, intercept, R-squared, and
+  p-value out of the summary, and say what each one means biologically.
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(gradethis)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(httr)
+library(shiny)
+library(BisonExplorR)   # coach_ui() / coach_server()
+
+gradethis_setup()
+tutorial_options(
+  exercise.checker = gradethis::grade_learnr,
+  exercise.completion = TRUE
+)
+knitr::opts_chunk$set(echo = FALSE)
+
+`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
+
+# Resolve the student ID no matter which session scope a handler receives.
+# VERIFIED 2026-07-25 (learnr 0.11.6): question() blocks are Shiny MODULES, so
+# a question_submission handler gets a NAMESPACED session whose input$sid is
+# EMPTY. The ID lives on the root session. This fails silently -- rows land in
+# the sheet looking well-formed but unattributable, grade_module() drops them,
+# and the student loses that score with no warning anywhere. Do not "simplify"
+# this back to session$input$sid.
+bx_get_sid <- function(session) {
+  usable <- function(x) !is.null(x) && length(x) > 0 && nzchar(as.character(x)[1])
+  sid <- tryCatch(session$rootScope()$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$userData$bx_sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  NULL   # log_attempt()'s %||% turns this into "unknown"
+}
+
+# Is this the GRADED deployment or a practice copy?
+# Set BISONEXPLORR_GRADED=true in the deployed app's .Renviron (or set the
+# option in its startup). Practice copies launched with run_tutorial() never
+# see it, so they default to FALSE.
+#
+# WHY THE PRACTICE BRANCH SHOWS A VISIBLE BANNER RATHER THAN NOTHING: if this
+# flag is ever missing on a deployed graded app, the ID box disappears and
+# nothing logs -- every student silently scores zero. A banner makes a
+# misconfigured deploy announce itself on the first screen instead of three
+# weeks later in the response sheet.
+bx_is_graded <- function() {
+  isTRUE(getOption(
+    "BisonExplorR.graded",
+    identical(tolower(Sys.getenv("BISONEXPLORR_GRADED")), "true")
+  ))
+}
+
+log_attempt <- function(student_id, exercise_id, correct) {
+  # Practice copies do not log. Without this, practice attempts POST with
+  # student_id = "unknown" and fill the response sheet with orphan rows
+  # that look like a bug in grade_module().
+  if (!bx_is_graded()) return(invisible(NULL))
+
+  tryCatch({
+    httr::POST(
+      url = "https://docs.google.com/forms/d/e/1FAIpQLSfmm3cUcoaWWYBb0zk7rbowSpgUL13nQc-Dxn7K8zQ30GdykA/formResponse",
+      body = list(
+        "entry.1413675438" = as.character(Sys.time()),
+        "entry.1257984687" = as.character(student_id %||% "unknown"),
+        "entry.1315894547" = "module6",
+        "entry.1172625272" = as.character(exercise_id %||% "unknown"),
+        "entry.1835356043" = as.character(correct %||% "NA")
+      ),
+      encode = "form"
+    )
+  }, error = function(e) message("Logging failed: ", e$message))
+}
+
+# Package dataset — always available to every exercise
+algae <- read.csv(system.file("extdata", "algae_light.csv", package = "BisonExplorR"))
+
+# The fitted model, pre-made so later exercises can use it (learnr sandboxes
+# each exercise, so anything shared has to be built here).
+fit <- lm(co2_drawdown_ppm ~ light_umol, data = algae)
+```
+
+```{r event-setup, context="server-start"}
+event_register_handler("exercise_result", function(session, event, data) {
+  log_attempt(
+    student_id  = bx_get_sid(session),
+    exercise_id = data$label,
+    correct     = data$feedback$correct
+  )
+})
+```
+
+```{r coach-server, context="server"}
+# One coach_server() per coached exercise. The exercise_id string must match a
+# key in the server-side exercise_registry.R ("moduleN-qM", hyphenated).
+# get_tutorial_state() is what feeds the coach the student's own submission.
+coach_server("coach_q2", shiny::reactive(learnr::get_tutorial_state("q2")), "module6-q2")
+coach_server("coach_q4", shiny::reactive(learnr::get_tutorial_state("q4")), "module6-q4")
+coach_server("coach_q5", shiny::reactive(learnr::get_tutorial_state("q5")), "module6-q5")
+```
+
+## Before you start
+
+```{r student-id, echo=FALSE}
+uiOutput("sid_ui")
+```
+
+```{r sid-server, context="server"}
+# The ID box exists ONLY in the graded deployment. See bx_is_graded() in setup.
+output$sid_ui <- renderUI({
+  if (!bx_is_graded()) {
+    return(shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #C05621; background:#FDF6EC;"),
+      shiny::strong("Practice mode."),
+      " Nothing here is recorded and this copy does not count for credit.",
+      " To do this module for credit, run ",
+      shiny::tags$code('launch_graded_tutorial("module6")'),
+      " instead."
+    ))
+  }
+  shiny::tagList(
+    shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #1F3864; background:#F2F4F7;"),
+      shiny::strong("Graded copy."),
+      " Your work on this module is recorded, so enter your student ID before",
+      " you begin. Use the same ID every time \u2014 a different ID reads as a",
+      " different student and your work will not be combined."
+    ),
+    shiny::textInput("sid",
+      "Student ID (the same one you used in Module 1):", value = ""),
+    shiny::div(id = "sid_warn",
+      style = "color:#C05621; font-weight:600; margin:-6px 0 8px 0;",
+      "Enter your ID to continue."),
+    # Client-side gate on the section's Continue button. This prevents the
+    # ACCIDENTAL case (a student who forgets), not a determined one -- anyone
+    # with devtools can re-enable the button. The real protection against
+    # unattributed rows is that grade_module() drops blank IDs.
+    shiny::tags$script(shiny::HTML("
+      (function () {
+        function apply() {
+          var sid = document.getElementById('sid');
+          if (!sid) return;
+          var sec = sid.closest('.section');
+          if (!sec) return;
+          var btns = sec.querySelectorAll('.topicActions button, .continueButton');
+          var ok = sid.value.trim().length > 0;
+          btns.forEach(function (b) {
+            b.disabled = !ok;
+            b.style.opacity = ok ? '' : '0.45';
+            b.style.cursor  = ok ? '' : 'not-allowed';
+          });
+          var w = document.getElementById('sid_warn');
+          if (w) w.style.display = ok ? 'none' : 'block';
+        }
+        document.addEventListener('input', function (e) {
+          if (e.target && e.target.id === 'sid') apply();
+        });
+        // learnr renders sections progressively, so the Continue button may not
+        // exist yet when this script first runs.
+        new MutationObserver(apply)
+          .observe(document.body, { childList: true, subtree: true });
+        apply();
+      })();
+    "))
+  )
+})
+
+# Cache the ID on userData as a second, independent path to it. bx_get_sid()
+# checks rootScope() first and falls back to this.
+shiny::observeEvent(input$sid, {
+  if (!is.null(input$sid) && nzchar(input$sid)) {
+    session$userData$bx_sid <- input$sid
+  }
+}, ignoreInit = TRUE)
+```
+
+
+In Module 5 you compared **groups**. But a lot of biology isn't about groups at all — it's about
+one measured number predicting another. Does more light mean more photosynthesis? Does a bigger
+animal have a slower heart? Those questions need a **line**, not a group comparison.
+
+We'll work with `algae`, data from an algae-bead experiment much like the one you ran: 36 vials of
+beads, each held at a different **light intensity**, with the **CO~2~ drawn down** out of the
+indicator solution measured after 30 minutes.
+
+```{r peek, exercise=TRUE}
+head(algae)
+```
+
+| Column | What it is | Units |
+|---|---|---|
+| `vial_id` | which vial | — |
+| `light_umol` | light intensity the vial was held at | µmol photons m^-2^ s^-1^ |
+| `co2_drawdown_ppm` | CO~2~ removed from the solution in 30 min | ppm |
+
+A **positive** drawdown means the beads pulled CO~2~ out of the solution — net photosynthesis.
+A **negative** drawdown means CO~2~ went *up* — the beads released more by respiring than they
+took up. Hold onto that; it matters later.
+
+By the end of this module you should be able to:
+
+- Recognise when a question needs a regression rather than a group comparison
+- Fit a linear model with `lm()` and read its `summary()`
+- Say what the **slope**, the **intercept**, the **R^2^**, and the **p-value** each mean
+- Report a regression result the way a biologist would
+
+---
+
+## The map: which test, when
+
+Keep this table in view — it is the same in every statistics module. The last column tells you
+where each test is taught.
+
+| Biological question | Predictor(s) | Test | R function | Module |
+|---|---|---|---|---|
+| Do **two** groups differ? | one factor, 2 levels | t-test | `t.test()` | 5 |
+| Do **three or more** groups differ? | one factor, 3+ levels | one-way ANOVA | `aov()` + `summary()` | 5 |
+| Does a **continuous** variable predict the response? | one continuous | linear regression | `lm()` + `summary()` | **6** |
+| Do groups differ across **two factors**? | two factors | two-way ANOVA | `aov()` + `summary()` | 7 |
+| Do groups differ **after controlling for** a continuous variable? | factor + covariate | ANCOVA | `aov()` + `summary()` | 8 |
+
+**Where you are:** Module 6 — one continuous predictor.
+
+### Pick the test
+
+```{r pick_test, echo=FALSE}
+question(
+  "You want to know whether light intensity predicts CO~2~ drawdown. Light was set to nine different values from 0 to 400 µmol. Which test?",
+  answer("Linear regression", correct = TRUE, message = "Right. Light is a measured number, not a label — so you want a slope, not a group difference."),
+  answer("One-way ANOVA with nine groups", message = "You could force it, but you would throw away the ordering. ANOVA treats 50 and 400 as two unrelated labels; regression uses the fact that 400 is eight times 50."),
+  answer("t-test", message = "A t-test compares two groups. There are no groups here — light is continuous."),
+  allow_retry = TRUE
+)
+```
+
+---
+
+## You have already drawn this line
+
+In Module 4 you added a trend line to a scatter plot with `geom_smooth(method = "lm")`. That line
+was already a regression — `ggplot` fitted it quietly and drew it. This module opens the hood:
+the same line, but now you get the **numbers** behind it.
+
+Always start by looking. A regression on data you haven't plotted is a regression you can't trust.
+
+### Your turn
+
+Build a scatter plot of `co2_drawdown_ppm` (y) against `light_umol` (x), with `geom_point()`.
+
+```{r q1, exercise=TRUE}
+ggplot(algae, aes(x = ___, y = ___)) +
+  ___
+```
+
+```{r q1-check}
+grade_this({
+  if (!inherits(.result, "ggplot")) {
+    fail("That didn't return a plot. Start with ggplot(algae, aes(...)) and add geom_point().")
+  }
+  mapped <- names(.result$mapping)
+  xvar <- rlang::as_label(.result$mapping$x %||% quote(NA))
+  yvar <- rlang::as_label(.result$mapping$y %||% quote(NA))
+  geoms <- sapply(.result$layers, function(l) class(l$geom)[1])
+  if (!"GeomPoint" %in% geoms) {
+    fail("You need a points layer — add geom_point().")
+  }
+  if (!grepl("light_umol", xvar) || !grepl("co2_drawdown_ppm", yvar)) {
+    fail("Check your axes: light_umol is the predictor (x), co2_drawdown_ppm is the response (y).")
+  }
+  pass("There's the relationship — it climbs, roughly in a straight line, and the lowest-light vials sit below zero.")
+})
+```
+
+Notice two things in that plot. The cloud **rises** — more light, more drawdown. And at the
+left-hand edge, several points sit **below zero**. Those are the dark vials, releasing CO~2~.
+
+---
+
+## Fitting the model: `lm()`
+
+A linear model is one function call. The formula reads **response `~` predictor** — the same
+`y ~ x` shape you used for `t.test()` in Module 5:
+
+```r
+lm(response ~ predictor, data = your_data)
+```
+
+On its own, `lm()` prints almost nothing useful. Wrap it in `summary()` — that's where the whole
+readout lives. This is the house pattern for every model in this course: **`lm()` then
+`summary()`**.
+
+### Your turn
+
+Fit a model predicting `co2_drawdown_ppm` from `light_umol` using the `algae` data, and pass it
+straight to `summary()`.
+
+```{r q2, exercise=TRUE}
+summary(lm(___ ~ ___, data = ___))
+```
+
+```{r q2-check}
+grade_this({
+  if (!inherits(.result, "summary.lm")) {
+    fail("That didn't return a model summary. Wrap your lm() call in summary().")
+  }
+  cf <- coef(.result)
+  if (!"light_umol" %in% rownames(cf)) {
+    fail("Check your formula — it should be co2_drawdown_ppm ~ light_umol (response on the left).")
+  }
+  if (abs(cf["light_umol", "Estimate"] - 0.12175) > 0.001) {
+    fail("The formula looks reversed. Response goes on the left of the ~, predictor on the right.")
+  }
+  pass("That readout is the whole model. Now let's take it apart line by line.")
+})
+```
+
+Your output should look like this:
+
+```
+Coefficients:
+              Estimate Std. Error t value Pr(>|t|)
+(Intercept) -14.466667   2.087800  -6.929 5.50e-08 ***
+light_umol    0.121750   0.008770  13.882 1.44e-15 ***
+
+Residual standard error: 6.794 on 34 degrees of freedom
+Multiple R-squared:  0.85,	Adjusted R-squared:  0.8456
+F-statistic: 192.7 on 1 and 34 DF,  p-value: 1.441e-15
+```
+
+Four numbers matter. We'll take them one at a time.
+
+```{r coach-ui-q2, echo=FALSE}
+coach_ui("coach_q2", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+
+---
+
+## The slope
+
+The slope is the row named after your predictor — here `light_umol`, estimate **0.1218**.
+
+A slope always carries **units**: *response units per one unit of predictor*. So:
+
+> For every extra 1 µmol m^-2^ s^-1^ of light, CO~2~ drawdown increases by about **0.12 ppm**.
+
+Per-unit slopes are often awkwardly small. Scale them to something a reader can picture — over a
+100 µmol increase in light, drawdown rises by about **12 ppm**.
+
+```{r slope_units, echo=FALSE}
+question(
+  "The slope is 0.1218. What are its units?",
+  answer("ppm per µmol m^-2^ s^-1^", correct = TRUE, message = "Yes — response units over predictor units. Always state both."),
+  answer("ppm", message = "Not quite. A slope is a *rate*: how much y changes per unit of x. It needs both units."),
+  answer("µmol m^-2^ s^-1^", message = "That's the predictor's units alone. A slope combines both."),
+  answer("It has no units — it's a correlation", message = "That's r or R^2^, which are unitless. A regression slope is not."),
+  allow_retry = TRUE
+)
+```
+
+### Your turn
+
+`coef()` pulls the two coefficients out as a named numeric vector — handy when you want the
+numbers themselves rather than the printed table. The fitted model is already available as `fit`.
+
+```{r q3, exercise=TRUE}
+# Return the coefficients of the fitted model.
+___(fit)
+```
+
+```{r q3-check}
+grade_this({
+  if (!is.numeric(.result) || length(.result) != 2) {
+    fail("Expected two numbers — the intercept and the slope. Try coef(fit).")
+  }
+  if (!all(c("(Intercept)", "light_umol") %in% names(.result))) {
+    fail("Use coef(fit) — it returns both coefficients with their names.")
+  }
+  pass("Intercept -14.47, slope 0.1218. The same two numbers from the summary table, now as a vector you could do arithmetic on.")
+})
+```
+
+---
+
+## The intercept: what happens in the dark
+
+The intercept is the model's prediction when the predictor equals **zero** — here, drawdown at
+zero light. It comes out at **-14.47 ppm**, and it is significantly different from zero
+(p = 5.5 × 10^-8^).
+
+That negative value is not an error. It is the biology:
+
+> In darkness the beads cannot photosynthesise, but they are still **respiring** — so CO~2~ in
+> the vial *rises* rather than falls. The intercept is an estimate of the algae's dark respiration
+> rate.
+
+This is worth dwelling on, because intercepts are often meaningless. If you regressed heart rate
+on body mass, the intercept would be the predicted heart rate of an animal weighing zero
+kilograms — a number with no biological referent at all. **Always ask whether zero is a real,
+reachable value for your predictor before you interpret an intercept.** Here it is: a vial in the
+dark is a perfectly ordinary vial.
+
+```{r intercept_meaning, echo=FALSE}
+question(
+  "A classmate regresses leaf area on plant height across 40 seedlings and reports: 'The intercept is 3.1 cm^2^, so a plant of zero height has 3.1 cm^2^ of leaf.' What's wrong?",
+  answer("A plant of zero height doesn't exist, so the intercept has no biological meaning here — it's just where the fitted line happens to cross the axis.", correct = TRUE, message = "Exactly. The intercept is always mathematically defined; whether it *means* anything depends on whether zero is reachable."),
+  answer("Nothing — that's the correct reading of an intercept.", message = "The arithmetic is right but the biology isn't. Zero height is not an achievable plant."),
+  answer("The intercept should always be zero.", message = "No — there's no rule forcing an intercept through the origin, and forcing one usually distorts the fit."),
+  answer("They should have used the slope instead.", message = "The slope is a different quantity. The issue is specifically whether zero is a meaningful predictor value."),
+  allow_retry = TRUE
+)
+```
+
+---
+
+## R^2^: how much of the variation is explained
+
+**R^2^** answers a different question from the slope. The slope says *which way and how steeply*;
+R^2^ says *how tightly the points hug the line*.
+
+It runs from 0 to 1, and reads as a proportion of variation explained. Here R^2^ = **0.85**:
+
+> About **85%** of the variation in CO~2~ drawdown is explained by light intensity. The other 15%
+> is everything else — differences between beads, pipetting error, temperature drift.
+
+A high R^2^ does **not** mean the relationship is important, and a low one doesn't mean it's
+absent. A slope can be tiny and precise (high R^2^, trivial effect) or large and noisy (low R^2^,
+big effect). Report both.
+
+### Your turn
+
+`summary(fit)` returns an object you can reach into with `$`. The element you want is
+`r.squared`.
+
+```{r q4, exercise=TRUE}
+# Pull just the R-squared value out of the model summary.
+summary(fit)$___
+```
+
+```{r q4-check}
+grade_this({
+  if (!is.numeric(.result) || length(.result) != 1) {
+    fail("Expected a single number. Try summary(fit)$r.squared.")
+  }
+  if (abs(.result - 0.85) > 0.005) {
+    fail("Close, but that isn't R-squared. Note that $adj.r.squared is a different (slightly smaller) value.")
+  }
+  pass("0.85 — light intensity accounts for about 85% of the variation in drawdown.")
+})
+```
+
+```{r coach-ui-q4, echo=FALSE}
+coach_ui("coach_q4", "Stuck? Ask the Coach")
+```
+
+> Ask the Coach if you are unsure *which* R-squared the exercise wants.
+
+
+---
+
+## The p-value: is the slope real?
+
+The p-value on the slope row tests one specific claim: **the true slope is zero** — that is, that
+light tells you nothing about drawdown. Here it is 1.44 × 10^-15^, far below 0.05, so we reject
+that claim.
+
+Note what this p-value is *not* about. It doesn't say the relationship is strong (that's R^2^), or
+that a line is the right shape (that's your scatter plot's job), or that light *causes* the
+drawdown — though here it does, because light was **experimentally set** rather than merely
+observed. Causation comes from the design, never from the model.
+
+```{r pval_meaning, echo=FALSE}
+question(
+  "The slope's p-value is 1.44e-15. Which statement is correct?",
+  answer("There is very strong evidence that the true slope is not zero.", correct = TRUE, message = "Right — that's precisely the claim being tested."),
+  answer("There is a 1.44e-15 probability that the results are due to chance.", message = "A common misreading. The p-value is the probability of data this extreme *if* the slope were truly zero — not the probability that chance is the explanation."),
+  answer("The relationship is very strong.", message = "Strength is R^2^ (0.85 here). A p-value can be tiny for a weak relationship if the sample is large."),
+  answer("85% of the variation is explained.", message = "That's the R^2^, a different number in the same output."),
+  allow_retry = TRUE
+)
+```
+
+---
+
+## Putting it back on the figure
+
+Now close the loop. In Module 4 you annotated a trend line with `stat_regline_equation()` and
+`stat_cor()` from **ggpubr** — those two functions are drawing exactly the numbers you just
+extracted by hand.
+
+### Your turn
+
+Rebuild the scatter plot, add a straight-line fit with `geom_smooth(method = "lm")`, and annotate
+it with `stat_regline_equation()`.
+
+```{r q5, exercise=TRUE}
+ggplot(algae, aes(x = light_umol, y = co2_drawdown_ppm)) +
+  geom_point() +
+  ___(method = "lm") +
+  ___() +
+  labs(x = "Light intensity (µmol m-2 s-1)",
+       y = "CO2 drawdown (ppm)")
+```
+
+```{r q5-check}
+grade_this({
+  if (!inherits(.result, "ggplot")) {
+    fail("That didn't return a plot.")
+  }
+  geoms <- sapply(.result$layers, function(l) class(l$geom)[1])
+  if (!"GeomPoint" %in% geoms) {
+    fail("Keep the points layer — geom_point().")
+  }
+  if (!any(c("GeomSmooth", "GeomLine") %in% geoms)) {
+    fail("Add the fitted line with geom_smooth(method = \"lm\").")
+  }
+  if (!any(grepl("Text|Label", geoms))) {
+    fail("Add stat_regline_equation() so the equation is printed on the figure.")
+  }
+  pass("The equation on that figure is y = -14 + 0.12x — your slope and intercept, drawn.")
+})
+```
+
+```{r coach-ui-q5, echo=FALSE}
+coach_ui("coach_q5", "Stuck? Ask the Coach")
+```
+
+> Ask the Coach if a layer is missing and you cannot tell which one.
+
+
+---
+
+## Reporting a regression
+
+A regression result in a biology paper needs four things: the **direction and size** of the slope
+with units, the **R^2^**, the **test statistic and p-value**, and the **sample size**. Something
+like:
+
+> CO~2~ drawdown increased significantly with light intensity, by 0.12 ppm per µmol m^-2^ s^-1^
+> (linear regression: R^2^ = 0.85, F~1,34~ = 192.7, p < 0.001, n = 36). The negative intercept
+> (-14.5 ppm) indicates net CO~2~ release under darkness, consistent with continued respiration.
+
+Notice that the sentence leads with the **biology** and puts the statistics in parentheses. The
+numbers support the claim; they aren't the claim.
+
+```{r reporting_check, echo=FALSE}
+question(
+  "Which of these is missing from the report sentence above, if you were writing it for a lab report?",
+  answer("Nothing — direction, size, units, R^2^, test statistic, p, and n are all there.", correct = TRUE, message = "Correct. Use it as your template."),
+  answer("The mean drawdown", message = "A mean isn't part of a regression report — the line replaces it."),
+  answer("The standard error of every point", message = "Not needed; the residual error is already summarised by R^2^ and the F-test."),
+  allow_retry = TRUE
+)
+```
+
+---
+
+## You made it
+
+In this module you learned to:
+
+- tell a regression question from a group-comparison question
+- fit a model with `lm(response ~ predictor, data = ...)` and read it with `summary()`
+- interpret the **slope** with its units, and check whether the **intercept** is biologically meaningful
+- read **R^2^** as variation explained, separately from the **p-value** on the slope
+- extract coefficients with `coef()` and R^2^ with `summary(fit)$r.squared`
+- annotate a fitted line on a figure, and report the result in a sentence
+
+Next up is **Module 7**, which goes back to groups — but two grouping factors at once, and the
+possibility that they interact. After that, **Module 8** brings the two halves together: ANCOVA,
+which is this module's regression *plus* a grouping factor.

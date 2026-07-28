@@ -1,0 +1,30 @@
+species,group,body_mass_kg,heart_rate_bpm,lifespan_years,log_mass
+House mouse,Rodent,0.021,600,2,-1.678
+Deer mouse,Rodent,0.028,570,3,-1.553
+Gerbil,Rodent,0.07,480,4,-1.155
+Chipmunk,Rodent,0.1,500,6,-1.0
+Hamster,Rodent,0.12,450,3,-0.921
+Rat,Rodent,0.3,360,3,-0.523
+Gray squirrel,Rodent,0.5,300,12,-0.301
+Guinea pig,Rodent,0.9,280,8,-0.046
+Domestic cat,Carnivore,4.5,150,15,0.653
+Red fox,Carnivore,6.0,130,5,0.778
+Small dog,Carnivore,8.0,120,14,0.903
+Large dog,Carnivore,32,85,11,1.505
+Wolf,Carnivore,40,80,13,1.602
+Black bear,Carnivore,120,50,25,2.079
+Lion,Carnivore,190,45,15,2.279
+Tiger,Carnivore,220,42,20,2.342
+Goat,Ungulate,55,85,15,1.74
+Sheep,Ungulate,70,75,12,1.845
+Deer,Ungulate,90,72,10,1.954
+Pig,Ungulate,150,70,15,2.176
+Horse,Ungulate,500,38,28,2.699
+Cow,Ungulate,650,55,20,2.813
+Elephant,Ungulate,4000,28,65,3.602
+Mouse lemur,Primate,0.06,490,8,-1.222
+Squirrel monkey,Primate,0.9,250,20,-0.046
+Macaque,Primate,8.0,140,25,0.903
+Chimpanzee,Primate,50,85,40,1.699
+Human,Primate,70,70,78,1.845
+Gorilla,Primate,160,55,40,2.204

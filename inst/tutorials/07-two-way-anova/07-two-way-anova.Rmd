@@ -1,0 +1,441 @@
+---
+title: "Module 7: Two-way ANOVA"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+description: >
+  Add a second grouping factor. Fit a two-way ANOVA, read the interaction first,
+  and show both factors at once with a grouped boxplot and an interaction plot.
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(shiny)
+library(BisonExplorR)   # coach_ui() / coach_server()
+library(gradethis)
+library(httr)
+library(ggplot2)
+gradethis::gradethis_setup()
+tutorial_options(
+  exercise.checker = gradethis::grade_learnr,
+  exercise.completion = TRUE
+)
+knitr::opts_chunk$set(echo = FALSE)
+
+`%||%` <- function(a, b) if (!is.null(a) && length(a) > 0) a else b
+
+# Resolve the student ID no matter which session scope a handler receives.
+# VERIFIED 2026-07-25 (learnr 0.11.6): question() blocks are Shiny MODULES, so
+# a question_submission handler gets a NAMESPACED session whose input$sid is
+# EMPTY. The ID lives on the root session. This fails silently -- rows land in
+# the sheet looking well-formed but unattributable, grade_module() drops them,
+# and the student loses that score with no warning anywhere. Do not "simplify"
+# this back to session$input$sid.
+bx_get_sid <- function(session) {
+  usable <- function(x) !is.null(x) && length(x) > 0 && nzchar(as.character(x)[1])
+  sid <- tryCatch(session$rootScope()$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$userData$bx_sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  sid <- tryCatch(session$input$sid, error = function(e) NULL)
+  if (usable(sid)) return(sid)
+  NULL   # log_attempt()'s %||% turns this into "unknown"
+}
+
+# Is this the GRADED deployment or a practice copy?
+# Set BISONEXPLORR_GRADED=true in the deployed app's .Renviron (or set the
+# option in its startup). Practice copies launched with run_tutorial() never
+# see it, so they default to FALSE.
+#
+# WHY THE PRACTICE BRANCH SHOWS A VISIBLE BANNER RATHER THAN NOTHING: if this
+# flag is ever missing on a deployed graded app, the ID box disappears and
+# nothing logs -- every student silently scores zero. A banner makes a
+# misconfigured deploy announce itself on the first screen instead of three
+# weeks later in the response sheet.
+bx_is_graded <- function() {
+  isTRUE(getOption(
+    "BisonExplorR.graded",
+    identical(tolower(Sys.getenv("BISONEXPLORR_GRADED")), "true")
+  ))
+}
+
+log_attempt <- function(student_id, exercise_id, correct) {
+  # Practice copies do not log. Without this, practice attempts POST with
+  # student_id = "unknown" and fill the response sheet with orphan rows
+  # that look like a bug in grade_module().
+  if (!bx_is_graded()) return(invisible(NULL))
+
+  tryCatch({
+    httr::POST(
+      url = "https://docs.google.com/forms/d/e/1FAIpQLSfmm3cUcoaWWYBb0zk7rbowSpgUL13nQc-Dxn7K8zQ30GdykA/formResponse",
+      body = list(
+        "entry.1413675438" = as.character(Sys.time()),
+        "entry.1257984687" = as.character(student_id %||% "unknown"),
+        "entry.1315894547" = "module7",
+        "entry.1172625272" = as.character(exercise_id %||% "unknown"),
+        "entry.1835356043" = as.character(correct %||% "NA")
+      ),
+      encode = "form"
+    )
+  }, error = function(e) message("Logging failed: ", e$message))
+}
+
+# Shared data — must live in the setup chunk (learnr sandboxes each exercise).
+# Read from the packaged CSV rather than generated with set.seed(): the numbers
+# quoted in the pass messages below were verified against THIS file, so a change
+# in R's RNG cannot silently invalidate them.
+#
+# Same dataset as Module 5, deliberately. There students ran a t-test on species
+# and a one-way ANOVA on nutrient_level SEPARATELY; here the two factors are
+# fitted together, which is the whole point of the module.
+algae <- read.csv(
+  system.file("extdata", "algae_beads.csv", package = "BisonExplorR"),
+  stringsAsFactors = FALSE
+)
+
+# House style: factors are pre-set here, never with inline as.factor().
+# nutrient_level needs an explicit level order — alphabetical would print
+# high, low, medium, which reads as nonsense on an axis.
+algae$species        <- factor(algae$species)
+algae$nutrient_level <- factor(algae$nutrient_level,
+                               levels = c("low", "medium", "high"))
+
+# Group means for the interaction plot (q3).
+algae_means <- aggregate(co2_drawdown_ppm ~ nutrient_level + species,
+                         data = algae, FUN = mean)
+```
+
+```{r event-setup, context="server-start"}
+event_register_handler("exercise_result", function(session, event, data) {
+  log_attempt(
+    student_id  = bx_get_sid(session),
+    exercise_id = data$label,
+    correct     = data$feedback$correct
+  )
+})
+```
+
+```{r coach-server, context="server"}
+# One coach_server() per coached exercise. The third argument must match a
+# key in the server-side exercise_registry.R ("moduleN-qM", HYPHENATED) --
+# an unknown key does not error, it silently returns generic context.
+# The Shiny id must match the coach_ui() call below it, or the card renders
+# and never responds.
+BisonExplorR::coach_server("coach_q1", shiny::reactive(learnr::get_tutorial_state("q1")), "module7-q1")
+BisonExplorR::coach_server("coach_q3", shiny::reactive(learnr::get_tutorial_state("q3")), "module7-q3")
+```
+
+
+## Before you start
+
+```{r student-id, echo=FALSE}
+uiOutput("sid_ui")
+```
+
+```{r sid-server, context="server"}
+# The ID box exists ONLY in the graded deployment. See bx_is_graded() in setup.
+output$sid_ui <- renderUI({
+  if (!bx_is_graded()) {
+    return(shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #C05621; background:#FDF6EC;"),
+      shiny::strong("Practice mode."),
+      " Nothing here is recorded and this copy does not count for credit.",
+      " To do this module for credit, run ",
+      shiny::tags$code('launch_graded_tutorial("module7")'),
+      " instead."
+    ))
+  }
+  shiny::tagList(
+    shiny::div(
+      style = paste("padding:12px 14px; margin:6px 0;",
+                    "border-left:4px solid #1F3864; background:#F2F4F7;"),
+      shiny::strong("Graded copy."),
+      " Your work on this module is recorded, so enter your student ID before",
+      " you begin. Use the same ID every time \u2014 a different ID reads as a",
+      " different student and your work will not be combined."
+    ),
+    shiny::textInput("sid",
+      "Student ID (the same one you used in Module 1):", value = ""),
+    shiny::div(id = "sid_warn",
+      style = "color:#C05621; font-weight:600; margin:-6px 0 8px 0;",
+      "Enter your ID to continue."),
+    # Client-side gate on the section's Continue button. This prevents the
+    # ACCIDENTAL case (a student who forgets), not a determined one -- anyone
+    # with devtools can re-enable the button. The real protection against
+    # unattributed rows is that grade_module() drops blank IDs.
+    shiny::tags$script(shiny::HTML("
+      (function () {
+        function apply() {
+          var sid = document.getElementById('sid');
+          if (!sid) return;
+          var sec = sid.closest('.section');
+          if (!sec) return;
+          var btns = sec.querySelectorAll('.topicActions button, .continueButton');
+          var ok = sid.value.trim().length > 0;
+          btns.forEach(function (b) {
+            b.disabled = !ok;
+            b.style.opacity = ok ? '' : '0.45';
+            b.style.cursor  = ok ? '' : 'not-allowed';
+          });
+          var w = document.getElementById('sid_warn');
+          if (w) w.style.display = ok ? 'none' : 'block';
+        }
+        document.addEventListener('input', function (e) {
+          if (e.target && e.target.id === 'sid') apply();
+        });
+        // learnr renders sections progressively, so the Continue button may not
+        // exist yet when this script first runs.
+        new MutationObserver(apply)
+          .observe(document.body, { childList: true, subtree: true });
+        apply();
+      })();
+    "))
+  )
+})
+
+# Cache the ID on userData as a second, independent path to it. bx_get_sid()
+# checks rootScope() first and falls back to this.
+shiny::observeEvent(input$sid, {
+  if (!is.null(input$sid) && nzchar(input$sid)) {
+    session$userData$bx_sid <- input$sid
+  }
+}, ignoreInit = TRUE)
+```
+
+
+## The map: which test, when
+
+Keep this table in view — it is the same in every statistics module. The last
+column tells you where each test is taught.
+
+| Biological question | Predictor(s) | Test | R function | Module |
+|---|---|---|---|---|
+| Do **two** groups differ? | one factor, 2 levels | t-test | `t.test()` | 5 |
+| Do **three or more** groups differ? | one factor, 3+ levels | one-way ANOVA | `aov()` + `summary()` | 5 |
+| Does a **continuous** variable predict the response? | one continuous | linear regression | `lm()` + `summary()` | 6 |
+| Do groups differ across **two factors**? | two factors | two-way ANOVA | `aov()` + `summary()` | 7 |
+| Do groups differ **after controlling for** a continuous variable? | factor + covariate | ANCOVA | `aov()` + `summary()` | 8 |
+
+**Where you are:** Module 7 — two grouping factors at once.
+
+## One response, two grouping factors
+
+You have seen this data before. In **Module 5** these were the same 60 vials of
+alginate-encapsulated algae beads: two species, three nutrient levels, and CO2
+drawdown measured for each vial.
+
+But in Module 5 you asked two *separate* questions:
+
+- a **t-test** — does drawdown differ between the two species?
+- a **one-way ANOVA** — does drawdown differ across the three nutrient levels?
+
+Each of those threw away half the design. The t-test pooled all three nutrient
+levels together and called that variation noise; the ANOVA did the same to
+species. A **two-way ANOVA** fits both factors in one model instead.
+
+It is still `aov()` + `summary()` — just two predictors instead of one. Writing
+the factors with a `*` between them does something extra: it also estimates
+their **interaction**, whether the effect of one factor *depends on* the level
+of the other. `nutrient_level * species` is shorthand for both main effects plus
+the interaction `nutrient_level:species`.
+
+```{r peek, exercise=TRUE}
+head(algae)
+```
+
+## Fit the two-way ANOVA
+
+### Exercise q1
+
+Fit a two-way ANOVA of `co2_drawdown_ppm` by `nutrient_level` and `species`
+**with their interaction**, and print the summary.
+
+```{r q1, exercise=TRUE}
+summary(aov(co2_drawdown_ppm ~ ___ * ___, data = algae))
+```
+
+```{r q1-hint}
+# The * gives you both main effects and the interaction.
+summary(aov(co2_drawdown_ppm ~ nutrient_level * species, data = algae))
+```
+
+```{r q1-solution}
+summary(aov(co2_drawdown_ppm ~ nutrient_level * species, data = algae))
+```
+
+```{r q1-check}
+grade_this({
+  if (inherits(.result, "summary.aov")) {
+    terms <- rownames(.result[[1]])
+    if (any(grepl("nutrient", terms)) && any(grepl("species", terms)) && any(grepl(":", terms))) {
+      pass("Three rows above Residuals: two main effects and the interaction. Nutrient F = 26.75, species F = 10.31, interaction F = 0.13. Always read the interaction line first.")
+    }
+    if (any(grepl("nutrient", terms)) && any(grepl("species", terms))) {
+      fail("Close — both factors are in the model, but there is no interaction row. Use * between them, not +.")
+    }
+  }
+  fail("Not quite. Use summary(aov(co2_drawdown_ppm ~ nutrient_level * species, data = algae)) — the * adds the interaction.")
+})
+```
+
+```{r coach-ui-q1, echo=FALSE}
+BisonExplorR::coach_ui("coach_q1", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+### Read the interaction first
+
+The interaction row tells you whether the main effects can even be interpreted
+on their own, so it comes first. Here `nutrient_level:species` has
+**p = 0.881** — nowhere near significant — while both main effects are
+significant (nutrient p = 8.4e-09, species p = 0.0022).
+
+```{r q1_interp, echo=FALSE}
+question(
+  "The interaction has p = 0.881 and both main effects are significant. What does that license you to say?",
+  answer("The effect of nutrient level is the same for both species, so the two main effects can be interpreted on their own.", correct = TRUE),
+  answer("Neither nutrient level nor species matters.", message = "Both main effects are significant — p = 8.4e-09 and p = 0.0022. It is only the interaction that is not."),
+  answer("You must drop a main effect from the model.", message = "A non-significant interaction is a result, not a reason to remove a main effect. Both factors stay."),
+  answer("Nutrient level and species are measuring the same thing.", message = "They are separate factors. The interaction asks whether their effects combine, not whether they are identical."),
+  allow_retry = TRUE
+)
+```
+
+### Why the two-way is worth the trouble
+
+Compare what you just fitted to Module 5:
+
+| Question | Module 5 (one factor) | Module 7 (both factors) |
+|---|---|---|
+| Does species matter? | t-test, **p = 0.022** | **p = 0.0022** |
+| Does nutrient matter? | one-way ANOVA, **p = 3.4e-08** | **p = 8.4e-09** |
+
+Same data, same 60 vials, and **both effects came out stronger.** Nothing was
+added — something was *removed*. In Module 5, when you tested species alone, all
+the variation caused by nutrient level was left sitting in the error term, making
+the noise look bigger than it really was. Fitting both factors together explains
+that variation instead of dumping it in the residual, so each effect is measured
+against a cleaner baseline.
+
+That is the practical argument for a two-way design: it is not just two tests at
+once, it is two **more sensitive** tests.
+
+## Show both factors at once
+
+A two-way design needs a figure that shows *both* factors. Two work well: a
+**grouped boxplot** (raw distributions, split by both factors) and an
+**interaction plot** (group means connected by lines).
+
+### Exercise q2: grouped boxplot
+
+Build a boxplot of `co2_drawdown_ppm` by `nutrient_level`, with the boxes split
+by `species` using `fill`. Finish with `theme_classic()`.
+
+```{r q2, exercise=TRUE}
+ggplot(algae, aes(x = nutrient_level, y = co2_drawdown_ppm, fill = ___)) +
+  geom_boxplot() +
+  labs(x = "Nutrient level", y = "CO2 drawdown (ppm)") +
+  theme_classic()
+```
+
+```{r q2-hint}
+# Map fill to the second factor.
+# fill = species
+```
+
+```{r q2-solution}
+ggplot(algae, aes(x = nutrient_level, y = co2_drawdown_ppm, fill = species)) +
+  geom_boxplot() +
+  labs(x = "Nutrient level", y = "CO2 drawdown (ppm)") +
+  theme_classic()
+```
+
+```{r q2-check}
+grade_this({
+  if (inherits(.result, "ggplot")) {
+    aes_names <- names(.result$mapping)
+    geoms <- vapply(.result$layers, function(l) class(l$geom)[1], character(1))
+    if (any(geoms == "GeomBoxplot") && "fill" %in% aes_names) {
+      pass("Now every nutrient level shows both species side by side. Both main effects are visible in one panel: the high boxes sit above the rest, and within every level the Scenedesmus box sits above the Chlorella box.")
+    }
+    if (any(geoms == "GeomBoxplot")) {
+      fail("You have the boxplot, but only one factor is showing. Map fill = species inside aes() so both factors appear.")
+    }
+  }
+  fail("Not quite. Map fill = species inside aes() and use geom_boxplot().")
+})
+```
+
+### Exercise q3: interaction plot
+
+An interaction plot draws the **group means** and connects them with a line per
+group; nearly parallel lines signal little interaction. The means are already
+computed for you in `algae_means`. Map `colour = species` and `group = species`,
+then add `geom_point()` and `geom_line()`.
+
+```{r q3, exercise=TRUE}
+ggplot(algae_means, aes(x = nutrient_level, y = co2_drawdown_ppm, colour = species, group = ___)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Nutrient level", y = "Mean CO2 drawdown (ppm)") +
+  theme_classic()
+```
+
+```{r q3-hint}
+# group = species tells ggplot to connect one line per species.
+# Without it ggplot sees a discrete x axis, finds no grouping, and draws nothing.
+```
+
+```{r q3-solution}
+ggplot(algae_means, aes(x = nutrient_level, y = co2_drawdown_ppm, colour = species, group = species)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Nutrient level", y = "Mean CO2 drawdown (ppm)") +
+  theme_classic()
+```
+
+```{r q3-check}
+grade_this({
+  if (inherits(.result, "ggplot")) {
+    geoms <- vapply(.result$layers, function(l) class(l$geom)[1], character(1))
+    if (any(geoms == "GeomLine") && any(geoms == "GeomPoint")) {
+      pass("The two lines climb together and never cross — the visual signature of the non-significant interaction you found in q1. Scenedesmus draws down more at every nutrient level, and both species respond to nutrients the same way.")
+    }
+    if (any(geoms == "GeomPoint")) {
+      fail("The points are there but the lines are missing. Check that group = species is set — geom_line() needs to know which points to connect.")
+    }
+  }
+  fail("Not quite. Set group = species, then add geom_point() and geom_line().")
+})
+```
+
+```{r coach-ui-q3, echo=FALSE}
+BisonExplorR::coach_ui("coach_q3", "Stuck? Ask the Coach")
+```
+
+> The Coach reads the attempt you last **submitted** — it will not see code you only ran. It gives one nudge, never the answer.
+
+### What a significant interaction would have looked like
+
+Your lines run roughly parallel. If the interaction *had* been significant, they
+would converge, diverge, or cross — meaning "does nutrient level matter?" would
+have no single answer, because the answer would be *it depends on the species*.
+That is why the interaction is read first: a significant one makes the main
+effect rows misleading, not just incomplete.
+
+## Where you landed
+
+- **Two grouping factors →** `summary(aov(response ~ factorA * factorB))`
+- The `*` adds the **interaction**; read that line **first**
+- A non-significant interaction means the main effects stand on their own
+- Fitting both factors together is **more sensitive** than two separate tests
+- Show both factors with a **grouped boxplot** or an **interaction plot**
+
+Next module keeps two predictors but changes the type of the second one: instead
+of a grouping factor, a **continuous** measurement you want to control for. That
+is **ANCOVA**, and it combines the regression you did in Module 6 with the group
+comparison you did in Module 5.
