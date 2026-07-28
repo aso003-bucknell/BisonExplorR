@@ -59,11 +59,21 @@ into the exam-day Posit Cloud project.
 | R Exam 2 | 2 · guided | *fish growth — exact filename not recorded* | fish | *not recorded* |
 | R Exam 2 | 3 · open (ANCOVA) | *stream invertebrates — filename not recorded* | stream inverts | *not recorded* |
 
-> ⚠️ **Six gaps.** The real exam documents are instructor-controlled and
-> not in project knowledge, so the exact filenames and column sets above
-> could not be read. **Fill these in from `BIOL204_R_Exam1.docx` and
-> `BIOL204_R_Exam2.docx` before relying on this registry** — until then
-> the collision check below is only as good as the organism column.
+> ⚠️ **Six gaps — still open as of 2026-07-28.** The real exam documents
+> are instructor-controlled and not in project knowledge, so the exact
+> filenames and column sets above cannot be read. **See
+> `EXAM_ROWS_WORKSHEET.md`** for a fill-in table, the one-liner that
+> dumps [`nrow()`](https://rdrr.io/r/base/nrow.html) and
+> [`names()`](https://rdrr.io/r/base/names.html) for every CSV in the
+> exam-day project, and the three re-checks to run afterwards (~10
+> minutes with both exam documents open). Until then the collision check
+> below is only as good as the organism column — real protection, but
+> not the filename check that catches the *silent* failure mode
+> described above.
+>
+> The three **Exam 1** filenames are reliable (recorded in seed §8). The
+> three **Exam 2** filenames were never written down anywhere — only the
+> organisms were.
 
 ------------------------------------------------------------------------
 

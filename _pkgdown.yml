@@ -48,10 +48,7 @@ reference:
   contents:
   - launch_graded_tutorial
   - get_lab
-  # ⚠️ get_practice_exam has no R/ source file and no NAMESPACE export yet, so
-  # pkgdown ERRORS here rather than warning. Uncomment once document() has
-  # generated man/get_practice_exam.Rd.
-  # - get_practice_exam
+  - get_practice_exam
 
 - title: For instructors
   desc: Grading and course administration.
