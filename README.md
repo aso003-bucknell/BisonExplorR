@@ -86,6 +86,25 @@ configured proxy it falls back to static offline nudges rather than failing.
 options(BisonExplorR.coach_url = "https://<your-proxy>/coach")
 ```
 
+
+## For developers / maintainers
+
+The `dev/` directory contains scripts used during development. It is excluded from the
+installed package by `.Rbuildignore` but is tracked by git and visible in the public repo.
+
+| Script | Purpose | Needs `coach-endpoint/`? |
+|---|---|---|
+| `build-site.R` | Ordered `document()` → `install()` → `build_site()` with pre-flight checks | no |
+| `apply_allow_skip.py` | Apply `allow_skip` YAML + per-section overrides to all modules | no |
+| `check_grading.py` | Cross-check `grade_module()` lookup against actual chunk labels | no |
+| `preflight-module5.R` | 40-check smoke test for Module 5 + the logging pipeline | yes (one check) |
+| `check-coach-registry.R` | Verify coach registry ↔ tutorial wiring (17 ↔ 17) | yes |
+| `backup-coach-endpoint.ps1` | Push endpoint to private repo + encrypted archive | yes |
+
+`coach-endpoint/` is gitignored and never arrives with a clone. It holds the plumber proxy
+and exercise registry — the server side of the Coach. Restore it from the private backup
+before running the scripts that need it. See `RECOVERY.md` in the private backup repo.
+
 ## What is deliberately not here
 
 Real exam documents, answer keys, and their datasets are instructor-controlled and live

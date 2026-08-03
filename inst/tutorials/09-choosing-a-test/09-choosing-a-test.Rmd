@@ -294,7 +294,7 @@ question(
 )
 ```
 
-## Now run it
+## Now run it {data-allow-skip="true"}
 
 For each scenario, decide on the test, then **write and run it** on `cardio`.
 

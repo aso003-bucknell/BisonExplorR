@@ -270,7 +270,7 @@ belong to *groups*.
 
 ---
 
-## Add a group: ANCOVA
+## Add a group: ANCOVA {data-allow-skip="true"}
 
 Here is the key move. That regression has one continuous predictor and treats all 120 people as
 interchangeable. But what if the two sexes sit at **different heart rates** on top of the mass
@@ -390,7 +390,7 @@ grade_this({
 
 ---
 
-## Checking the assumption: are the slopes parallel?
+## Checking the assumption: are the slopes parallel? {data-allow-skip="true"}
 
 Look again at those two lines. ANCOVA assumes the groups share a **common slope** — that mass
 affects heart rate the same way in both sexes, and the only difference between groups is the
@@ -456,7 +456,7 @@ question(
 
 ---
 
-## Two figures, one panel
+## Two figures, one panel {data-allow-skip="true"}
 
 A result usually needs more than one picture. Here you have two: the **pooled** regression from the
 review section, which ignores sex, and the **ANCOVA** figure from earlier, which splits it. Side by

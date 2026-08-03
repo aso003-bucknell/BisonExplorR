@@ -81,17 +81,11 @@ coach_ui <- function(id, title = "BisonExplorR Coach") {
     ))
   }
 
-  # VERIFIED 2026-07-22 in Posit Cloud. get_tutorial_state("qN") returns:
-  #   $type      chr  "exercise"
-  #   $answer    chr  the submitted source (with trailing newlines)
-  #   $correct   logi grading verdict
-  #   $timestamp chr  UTC string
-  # $answer is the field to use. The alternatives below are retained only as a
-  # guard against a future learnr rename; they are not currently exercised.
-  #
-  # NOTE: state populates on SUBMIT, not on Run, and is NULL until the first
-  # submission — which is what the coach wants, since it only ever discusses a
-  # submitted attempt.
+  # learnr's exercise state has not carried a stable field name across
+  # versions: the submitted source has appeared as $answer, $code, and
+  # $user_code depending on release. Try them in order rather than betting on
+  # one, so a learnr upgrade degrades to "no attempt yet" instead of silently
+  # coaching against an empty string.
   raw_code <- x$answer %||% x$code %||% x$user_code %||% x$last_value
   code <- if (is.null(raw_code)) "" else paste(raw_code, collapse = "\n")
   timestamp <- .bx_scalar_character(x$timestamp)

@@ -292,7 +292,7 @@ left-hand edge, several points sit **below zero**. Those are the dark vials, rel
 
 ---
 
-## Fitting the model: `lm()`
+## Fitting the model: `lm()` {data-allow-skip="true"}
 
 A linear model is one function call. The formula reads **response `~` predictor** — the same
 `y ~ x` shape you used for `t.test()` in Module 5:
@@ -431,7 +431,7 @@ question(
 
 ---
 
-## R^2^: how much of the variation is explained
+## R^2^: how much of the variation is explained {data-allow-skip="true"}
 
 **R^2^** answers a different question from the slope. The slope says *which way and how steeply*;
 R^2^ says *how tightly the points hug the line*.
@@ -500,7 +500,7 @@ question(
 
 ---
 
-## Putting it back on the figure
+## Putting it back on the figure {data-allow-skip="true"}
 
 Now close the loop. In Module 4 you annotated a trend line with `stat_regline_equation()` and
 `stat_cor()` from **ggpubr** — those two functions are drawing exactly the numbers you just

@@ -334,7 +334,7 @@ grade_this({
 
 ---
 
-## Standard error — how precise is that mean?
+## Standard error — how precise is that mean? {data-allow-skip="true"}
 
 A group mean is only an estimate. The **standard error (SE)** tells you how far that estimate is
 likely to sit from the true mean. It's the standard deviation divided by the square root of the
@@ -379,7 +379,7 @@ BisonExplorR::coach_ui("coach_q5", "Stuck? Ask the Coach")
 
 ---
 
-## Visualizing with `ggplot2`
+## Visualizing with `ggplot2` {data-allow-skip="true"}
 
 Every `ggplot` is built from three pieces:
 

@@ -6,7 +6,7 @@ output:
     allow_skip: false
     css: custom.css
 runtime: shiny_prerendered
-description: "Get oriented in RStudio, create objects, identify data types, and explore a dataframe."
+description: "Get oriented in RStudio, create objects, identify data types, and explore the goldenrod-gall dataframe."
 ---
 
 ```{r setup, include=FALSE}
@@ -81,7 +81,7 @@ log_attempt <- function(student_id, exercise_id, correct) {
 }
 
 # Package dataset — always available
-soil <- read.csv(system.file("extdata", "soil_data.csv", package = "BisonExplorR"))
+goldenrod <- read.csv(system.file("extdata", "goldenrod_data.csv", package = "BisonExplorR"))
 ```
 
 ```{r event-setup, context="server-start"}
@@ -96,7 +96,18 @@ event_register_handler("exercise_result", function(session, event, data) {
 
 ## Welcome to R
 
-R is a programming language built for data analysis. In this first module, you will learn how to recognize the main parts of RStudio, write simple code, create objects, and inspect a dataset that has already been loaded for you.
+R is a programming language built for working with data. You have spent this semester
+organising observations into tidy tables — one row per observation, one column per
+variable, units in the header, categories spelled the same way every time. This module is
+where you find out what those rules were *for*.
+
+R cannot look at a spreadsheet and work out what you meant. It reads the structure
+literally. A tidy table imports in one line and is immediately usable. An untidy one
+imports as something that looks almost right and then gives you wrong answers without
+complaining. The rules were never about neatness.
+
+In this module you will meet RStudio, write your first R code, and explore a dataset you
+already know — goldenrod stems, galled and ungalled, measured in the field.
 
 By the end of this module, you should be able to:
 
@@ -237,15 +248,19 @@ quiz(
 In R, you store values using the assignment operator `<-`. The result is called an **object**.
 
 ```{r assign-demo, exercise=FALSE, echo=TRUE}
-site_name <- "Forest Plot A"
-site_name
+quadrat_name <- "Old field, quadrat 3"
+quadrat_name
 ```
 
-The object `site_name` now stores the value `"Forest Plot A"`. You can also see it appear in the Environment pane.
+The object `quadrat_name` now stores the value `"Old field, quadrat 3"`. You can also see it appear in the Environment pane.
 
 ### Your turn
 
-Create an object called `num_samples` and assign it the value `15`.
+In the field you sampled goldenrod in **neighbour-matched pairs** — each galled stem
+recorded alongside an ungalled stem growing beside it. The practice dataset holds 15 such
+pairs.
+
+Create an object called `num_pairs` and assign it the value `15`.
 
 ```{r assign-exercise, exercise=TRUE}
 # Create your object below
@@ -255,23 +270,23 @@ Create an object called `num_samples` and assign it the value `15`.
 ```{r assign-exercise-check}
 grade_this({
   pass_if(
-    user_object_exists("num_samples") &&
-      identical(user_object_get("num_samples"), 15),
-    "Correct — `num_samples` is now 15."
+    user_object_exists("num_pairs") &&
+      identical(user_object_get("num_pairs"), 15),
+    "Correct — `num_pairs` is now 15. Keep that number in mind: 15 pairs, but 30 stems."
   )
 
   fail_if(
-    !user_object_exists("num_samples"),
-    "Try again. Create an object called `num_samples`."
+    !user_object_exists("num_pairs"),
+    "Try again. Create an object called `num_pairs`."
   )
 
   fail_if(
-    user_object_exists("num_samples") &&
-      !identical(user_object_get("num_samples"), 15),
-    "Try again. `num_samples` exists, but it should be assigned the value 15."
+    user_object_exists("num_pairs") &&
+      !identical(user_object_get("num_pairs"), 15),
+    "Try again. `num_pairs` exists, but it should be assigned the value 15."
   )
 
-  fail("Use `<-` to assign the value 15 to an object called `num_samples`.")
+  fail("Use `<-` to assign the value 15 to an object called `num_pairs`.")
 })
 ```
 
@@ -283,11 +298,15 @@ R recognizes several types of data. Three common types are:
 
 | Type | Description | Example |
 |------------------|--------------------------------|----------------------|
-| `numeric` | Numbers, including measurements and counts | `12.4`, `5` |
-| `character` | Text, usually written in quotes | `"forest"`, `"site_01"` |
+| `numeric` | Numbers, including measurements and counts | `8.5`, `12` |
+| `character` | Text, usually written in quotes | `"galled"`, `"P7U"` |
 | `logical` | TRUE or FALSE values | `TRUE`, `FALSE` |
 
 You can check what type an object is using `class()`.
+
+Type matters more than it sounds like it should. If one stem width was typed as `8.5 mm`
+instead of `8.5`, R reads that whole column as character, and every mean you calculate
+from it fails. This is the reason units belong in the header and never in the cell.
 
 #### Try it: `class()`
 
@@ -315,10 +334,18 @@ grade_this({
 ```{r types-quiz-check, echo=FALSE}
 quiz(
   caption = "",
-  question('A column containing values like "urban", "forest", and "agricultural" would be what data type in R?',
+  question('A column containing the values "galled" and "ungalled" would be what data type in R?',
     answer("numeric"),
     answer("logical"),
     answer("character", correct = TRUE, message = 'Correct. Text values are stored as the character type.'),
+    allow_retry = TRUE
+  ),
+  question('One student typed stem widths as "5.3 mm" instead of 5.3. What happens to that column in R?',
+    answer("R strips the units automatically"),
+    answer("R reads the whole column as character, so it cannot be averaged", correct = TRUE,
+           message = "Correct. One bad cell changes the type of the entire column, and nothing warns you."),
+    answer("R reads it as numeric and ignores the letters"),
+    answer("R refuses to import the file"),
     allow_retry = TRUE
   )
 )
@@ -330,14 +357,19 @@ quiz(
 
 A **dataframe** is R's version of a spreadsheet. It has rows and columns.
 
-In this tutorial, the soil dataset is already loaded for you as an object called `soil`.
+In this tutorial, a goldenrod dataset is already loaded for you as an object called
+`goldenrod`. It holds 15 neighbour-matched pairs — 30 stems in total — with stem width,
+gall diameter, and a count of inflorescence shoots for each stem.
+
+This is a long, tidy table: **one row per stem**, one column per variable. It is the shape
+your own field sheet was designed to produce.
 
 ### Confirm the data loaded
 
-Run the line below. You should see `"data.frame"`, which means `soil` is stored as a dataframe.
+Run the line below. You should see `"data.frame"`, which means `goldenrod` is stored as a dataframe.
 
 ```{r confirm-load, exercise=TRUE}
-class(soil)
+class(goldenrod)
 ```
 
 ```{r confirm-load-check}
@@ -347,7 +379,7 @@ grade_this({
     "Good — you ran the check."
   )
 
-  fail("Run `class(soil)` to check that the dataset is available.")
+  fail("Run `class(goldenrod)` to check that the dataset is available.")
 })
 ```
 
@@ -360,18 +392,18 @@ Once you have a dataframe, the first thing to do is look at it. Three functions 
 #### `head()` - see the first six rows
 
 ```{r head-exercise, exercise=TRUE}
-# Use head() on the soil dataset
+# Use head() on the goldenrod dataset
 
 ```
 
 ```{r head-exercise-check}
 grade_this({
   pass_if(
-    identical(.result, head(soil)),
-    "Correct — `head(soil)` shows the first six rows of the dataset."
+    identical(.result, head(goldenrod)),
+    "Correct — `head(goldenrod)` shows the first six rows. Notice the rows come in pairs: each galled stem sits next to its matched neighbour."
   )
 
-  fail("Try again. Use `head(soil)` to view the first six rows.")
+  fail("Try again. Use `head(goldenrod)` to view the first six rows.")
 })
 ```
 
@@ -380,37 +412,73 @@ grade_this({
 `str()` shows the variable names, data types, and a preview of the values.
 
 ```{r str-exercise, exercise=TRUE}
-# Use str() on the soil dataset
+# Use str() on the goldenrod dataset
 
 ```
 
 ```{r str-exercise-check}
 grade_this({
   pass_if(
-    grepl("str\\s*\\(\\s*soil\\s*\\)", .user_code),
-    "Correct — `str(soil)` shows the structure of the dataset."
+    grepl("str\\s*\\(\\s*goldenrod\\s*\\)", .user_code),
+    "Correct — `str(goldenrod)` shows the structure of the dataset."
   )
 
-  fail("Try again. Use `str(soil)` to inspect the dataset structure.")
+  fail("Try again. Use `str(goldenrod)` to inspect the dataset structure.")
 })
 ```
 
 #### `summary()` - see summary information
 
 ```{r summary-exercise, exercise=TRUE}
-# Use summary() on the soil dataset
+# Use summary() on the goldenrod dataset
 
 ```
 
 ```{r summary-exercise-check}
 grade_this({
   pass_if(
-    identical(.result, summary(soil)),
-    "Correct — `summary(soil)` gives summary information for each variable."
+    identical(.result, summary(goldenrod)),
+    "Correct — `summary(goldenrod)` gives summary information for each variable. Look at the bottom of the gall_diameter_mm column."
   )
 
-  fail("Try again. Use `summary(soil)` to summarize the dataset.")
+  fail("Try again. Use `summary(goldenrod)` to summarize the dataset.")
 })
+```
+
+### What `summary()` just told you about missing data
+
+Look again at the `gall_diameter_mm` column in your `summary()` output. Underneath the
+quartiles there is a line reading `NA's : 15`.
+
+That is not an error. Fifteen of the thirty stems are ungalled, and an ungalled stem has
+no gall to measure. Those cells were left **blank** in the source file, and R read a blank
+cell as `NA` — "not available."
+
+This is the reason for the rule you followed in lab: a blank cell means *not measured*, and
+a `0` means *measured, and the answer was none*. If someone had typed `0` into those
+fifteen cells instead, R would have happily averaged them in and reported a mean gall
+diameter roughly half its true value — with no warning of any kind.
+
+```{r na-quiz-check, echo=FALSE}
+quiz(
+  caption = "",
+  question("A student counted inflorescence shoots on a stem and found none. What belongs in the `n_inflorescence_shoots` cell?",
+    answer("Leave it blank"),
+    answer("0", correct = TRUE,
+           message = "Correct. The measurement was taken and the answer was zero. That is data, and it must not become NA."),
+    answer("NA"),
+    answer("A dash"),
+    allow_retry = TRUE
+  ),
+  question("A stem snapped before it could be measured. What belongs in the cell?",
+    answer("0"),
+    answer("Leave it blank, and give the reason in a notes column", correct = TRUE,
+           message = "Correct. R reads a blank as NA, which is exactly right — and the notes column records why, so it can be recovered later."),
+    answer("The group average"),
+    answer("A dash"),
+    allow_retry = TRUE
+  )
+)
 ```
 
 ------------------------------------------------------------------------
@@ -419,22 +487,22 @@ grade_this({
 
 `str()` is one of the most useful functions you will use. Let's practice reading its output.
 
-#### Run `str(soil)`
+#### Run `str(goldenrod)`
 
-Run `str(soil)` once more, then answer the questions that follow.
+Run `str(goldenrod)` once more, then answer the questions that follow.
 
 ```{r str-review, exercise=TRUE}
-str(soil)
+str(goldenrod)
 ```
 
 ```{r str-review-check}
 grade_this({
   pass_if(
-    grepl("str\\s*\\(\\s*soil\\s*\\)", .user_code),
+    grepl("str\\s*\\(\\s*goldenrod\\s*\\)", .user_code),
     "Correct — now use the output to answer the questions that follow."
   )
 
-  fail("Try again. Run `str(soil)`.")
+  fail("Try again. Run `str(goldenrod)`.")
 })
 ```
 
@@ -443,23 +511,31 @@ grade_this({
 ```{r str-quiz-1-check, echo=FALSE}
 quiz(
   caption = "",
-  question("Question 1: How many observations (rows) does the soil dataset have?",
-    answer("5"),
-    answer("6"),
-    answer("15", correct = TRUE, message = "Correct! The top line indicates there are 15 observations."),
-    answer("3"),
+  question("Question 1: How many observations (rows) does the goldenrod dataset have?",
+    answer("8"),
+    answer("15", message = "15 is the number of pairs. Each pair contributes two stems, and one row is one stem."),
+    answer("30", correct = TRUE, message = "Correct! The top line indicates there are 30 observations — 15 pairs, two stems each."),
+    answer("60"),
     allow_retry = TRUE
   ),
-  question("Question 2: In your str(soil) output, what data type is the land_use variable?",
+  question("Question 2: In your str(goldenrod) output, what data type is the gall_status variable?",
     answer("numeric"),
     answer("logical"),
     answer("character", correct = TRUE, message = "Correct! It is listed as a character (chr) variable."),
     allow_retry = TRUE
   ),
-  question("Question 3: What data type is soil_temp_c?",
+  question("Question 3: What data type is stem_width_mm?",
     answer("character"),
     answer("logical"),
     answer("numeric", correct = TRUE, message = "Correct! In str() output, numeric variables usually appear as 'num'."),
+    allow_retry = TRUE
+  ),
+  question("Question 4: Why does the dataset need a pair_id column at all?",
+    answer("To count how many stems were sampled"),
+    answer("To record which galled stem was matched with which ungalled neighbour", correct = TRUE,
+           message = "Correct. Without pair_id the matching you did in the field is lost, and the wrong statistical test runs silently."),
+    answer("To sort the rows alphabetically"),
+    answer("It is not needed; R can work it out"),
     allow_retry = TRUE
   )
 )
@@ -473,50 +549,55 @@ You can pull out a single column from a dataframe using the `$` operator.
 
 ### The `$` operator
 
-Run the line below to pull out the `land_use` column.
+Run the line below to pull out the `gall_status` column.
 
 ```{r dollar-demo, exercise=TRUE}
-soil$land_use
+goldenrod$gall_status
 ```
 
 ```{r dollar-demo-check}
 grade_this({
   pass_if(
-    identical(.result, soil$land_use),
-    "Correct — `soil$land_use` pulls out the `land_use` column."
+    identical(.result, goldenrod$gall_status),
+    "Correct — `goldenrod$gall_status` pulls out the `gall_status` column. Every value reads either galled or ungalled, spelled identically. That is not luck."
   )
 
-  fail("Run `soil$land_use` to access the `land_use` column.")
+  fail("Run `goldenrod$gall_status` to access the `gall_status` column.")
 })
 ```
 
+Every value in that column is either `galled` or `ungalled`, spelled and capitalised the
+same way every time. If a few rows read `Galled` or `un-galled`, R would treat them as
+additional, separate groups — and a comparison of two groups would quietly become a
+comparison of four.
+
 ### Your turn
 
-Use `$` to access the `organic_matter_pct` column.
+Use `$` to access the `stem_width_mm` column.
 
 ```{r dollar-exercise, exercise=TRUE}
-# Access the organic_matter_pct column from the soil data
+# Access the stem_width_mm column from the goldenrod data
 
 ```
 
 ```{r dollar-exercise-check}
 grade_this({
   pass_if(
-    identical(.result, soil$organic_matter_pct),
-    "Correct — you accessed the `organic_matter_pct` column using `$`."
+    identical(.result, goldenrod$stem_width_mm),
+    "Correct — you accessed the `stem_width_mm` column using `$`."
   )
 
   fail_if(
-    identical(.result, soil$land_use),
-    "That's the `land_use` column — try `soil$organic_matter_pct` instead."
+    identical(.result, goldenrod$gall_status),
+    "That's the `gall_status` column — try `goldenrod$stem_width_mm` instead."
   )
 
   fail_if(
-    identical(.result, soil$soil_temp_c),
-    "That's the `soil_temp_c` column — try `soil$organic_matter_pct` instead."
+    identical(.result, goldenrod$n_inflorescence_shoots),
+    "That's the `n_inflorescence_shoots` column — try `goldenrod$stem_width_mm` instead."
   )
 
-  fail("Use the `$` operator to access the column: `soil$organic_matter_pct`.")
+  fail("Use the `$` operator to access the column: `goldenrod$stem_width_mm`.")
 })
 ```
 
@@ -533,6 +614,9 @@ You have covered:
 - ✅ Exploring a dataframe with `head()`, `str()`, and `summary()`
 - ✅ Reading basic `str()` output
 - ✅ Accessing columns with `$`
+
+Everything you just did worked in one line because the table was tidy before it reached R.
+That is the whole point of the rules.
 
 ```{r finish-button, echo=FALSE}
 actionButton("finish_btn", "Mark as Complete", 
@@ -555,7 +639,7 @@ observeEvent(input$finish_btn, {
 })
 ```
 
-**Module 2** will show you how to set up your own Posit Cloud project and import your lab data.
+**Module 2** will show you how to set up your own Posit Cloud project and import a data file — including, eventually, your own.
 
 ```{r, echo=FALSE}
 # Hide previous button on final topic

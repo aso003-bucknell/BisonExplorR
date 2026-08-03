@@ -277,7 +277,12 @@ devtools::install(upgrade = F)
 source("dev/preflight-module5.R")
 ```
 
-Preflight still passes 45/45 with only the expected `coach_url` warning
+Preflight passes **39/40** with only the expected `coach_url` warning.
+⚠️ **Not 45/45** — that figure came from a copy of the script that was
+never committed; the repo version has 40 checks. The one FAIL, “registry
+object reachable”, appears only when `coach-endpoint/` is missing from
+the working folder — it is gitignored, so it never arrives with a fresh
+clone and must be copied across by hand.
 
 Spot-check one module from each group — M1 (CRLF, no coach) and M9 (LF,
 coach-wired) — to confirm both the banner and the ID box render

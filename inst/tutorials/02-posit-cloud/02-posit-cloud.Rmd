@@ -1,11 +1,12 @@
 ---
-title: "Module 2: Posit Cloud and Data Import"
+title: "Module 2: Posit Cloud and Importing Data"
 output:
   learnr::tutorial:
     progressive: true
     allow_skip: false
+    css: custom.css
 runtime: shiny_prerendered
-description: "Create a Posit Cloud project, open an R script, upload a CSV, import data with read.csv(), and make your first ggplot."
+description: "Set up a Posit Cloud project, import a CSV of goldenrod-gall data, check it, and make your first graph."
 ---
 
 ```{r setup, include=FALSE}
@@ -81,12 +82,12 @@ log_attempt <- function(student_id, exercise_id, correct) {
 }
 
 # Practice CSV path from the package
-soil_file <- system.file("extdata", "soil_data.csv", package = "BisonExplorR")
+goldenrod_file <- system.file("extdata", "goldenrod_data.csv", package = "BisonExplorR")
 
 # Pre-load the practice data so EVERY exercise can use lab_data.
 # (learnr runs each exercise in its own environment; only objects created
 #  here in the setup chunk are shared across all exercises.)
-lab_data <- read.csv(soil_file)
+lab_data <- read.csv(goldenrod_file)
 ```
 
 ```{r event-setup, context="server-start"}
@@ -176,8 +177,12 @@ shiny::observeEvent(input$sid, {
 }, ignoreInit = TRUE)
 ```
 
+In Module 1, you practiced basic R commands using a goldenrod dataset that was already
+loaded for you. In this module, you will set up your own workspace in **Posit Cloud**,
+learn how to import a CSV file yourself, and make your first graph.
 
-In Module 1, you practiced basic R commands using a dataset that was already loaded for you. In this module, you will set up your own workspace in **Posit Cloud**, learn how to import a CSV file, and make your first graph.
+This is the step where the tidy-data rules stop being a lab requirement and start being the
+thing that determines whether your own data works.
 
 By the end of this module, you should be able to:
 
@@ -339,9 +344,15 @@ Saving early is a good habit. It also makes it easier to find your work later.
 
 ---
 
-## Step 5 — Upload a CSV File
+## Step 5 — Export a Google Sheet and Upload It
 
-In lab, you may collect data in a Google Sheet. To use those data in R, you need to export the sheet as a CSV file and upload it to Posit Cloud.
+In lab, you collected goldenrod data in a Google Sheet. To use those data in R, you export
+the sheet as a CSV file and upload it to Posit Cloud.
+
+**Export the correct tab.** A CSV holds exactly one tab. If your workbook has `raw`,
+`tidy`, and `summary` tabs, open the **tidy** tab before you export — that is the one built
+to be read by a machine. Exporting the `raw` tab, or a tab with a merged title banner
+across the top, produces a file R will misread.
 
 To export your Google Sheet:
 
@@ -353,6 +364,11 @@ Then, in Posit Cloud:
 2. Click **Upload**
 3. Choose your CSV file
 4. Confirm that the file appears in the Files pane
+
+> **One thing to set now.** If you are sharing a class dataset, set its sharing to
+> *Anyone at Bucknell with the link can view*. In BIOL 204 you will read that sheet
+> directly from its link instead of downloading it, and if the permission is not set,
+> R receives a login page instead of your data.
 
 ---
 
@@ -366,10 +382,10 @@ The basic structure is:
 object_name <- read.csv("file_name.csv")
 ```
 
-For example, if your file is named `soil_data.csv`, you could write:
+For example, if your file is named `goldenrod_data.csv`, you could write:
 
 ```{r read-csv-example, eval=FALSE}
-lab_data <- read.csv("soil_data.csv")
+lab_data <- read.csv("goldenrod_data.csv")
 ```
 
 The object name goes on the left side of `<-`. The file name goes inside quotation marks.
@@ -379,11 +395,12 @@ The object name goes on the left side of `<-`. The file name goes inside quotati
 ## Practice: Import a CSV
 
 For this practice exercise, you will import a CSV file that is included with the course package.
+It holds 15 neighbour-matched pairs of goldenrod stems — the same data you explored in Module 1.
 
 Run the code below.
 
 ```{r import-practice, exercise=TRUE}
-lab_data <- read.csv(soil_file)
+lab_data <- read.csv(goldenrod_file)
 class(lab_data)
 ```
 
@@ -400,9 +417,9 @@ grade_this({
 
 ## Check That Your Data Imported Correctly
 
-After importing data, always check it before moving on.
-
-Three useful checks are:
+After importing data, always check it before moving on. `read.csv()` almost never fails
+outright — it succeeds, and gives you something subtly wrong. These three checks are how
+you catch that.
 
 ```{r check-data-syntax, eval=FALSE}
 head(lab_data)
@@ -440,7 +457,7 @@ grade_this({
   # str() prints its output and returns nothing, so .result is NULL here.
   # We check the submitted code instead.
   if (grepl("str\\s*\\(\\s*lab_data\\s*\\)", .user_code)) {
-    pass("Correct — str(lab_data) shows each variable's type and a preview of its values.")
+    pass("Correct — str(lab_data) shows each variable's type and a preview of its values. Check that every column you expect to be a number reads 'num' or 'int'.")
   }
   fail("Try again. Use str(lab_data).")
 })
@@ -457,11 +474,20 @@ Use `summary()` to summarize `lab_data`.
 ```{r summary-lab-data-check}
 grade_this({
   if (isTRUE(all.equal(.result, summary(lab_data)))) {
-    pass("Correct — summary(lab_data) summarizes each variable.")
+    pass("Correct — summary(lab_data) summarizes each variable, including how many values are missing.")
   }
   fail("Try again. Use summary(lab_data).")
 })
 ```
+
+### What to look for in those three outputs
+
+| Check | What you are looking for | What it means if it is wrong |
+|---|---|---|
+| `str()` | Every measurement column reads `num` or `int` | A measurement column reading `chr` means a cell somewhere holds text — usually a unit, a note, or `N/A` |
+| `str()` | The number of observations matches your real sample size | A number that is too high usually means a summary row got exported with the data |
+| `summary()` | The `NA's` count on each column | Blanks you expected are fine. Blanks you did not expect are a data-collection problem you still have time to fix |
+| `summary()` | Minimum and maximum are biologically possible | A stem width of 0.5 mm or 85 mm is a typo, not a plant |
 
 ---
 
@@ -483,23 +509,38 @@ File names must match exactly. Capital letters, spaces, and underscores all matt
 For example, these are different file names to R:
 
 ```text
-soil_data.csv
-Soil_Data.csv
-soil data.csv
-soil_data_2026.csv
+goldenrod_data.csv
+Goldenrod_Data.csv
+goldenrod data.csv
+goldenrod_data_2026.csv
 ```
 
 ---
 
 ## Common Import Problems
 
-If your file does not import, check these things first:
+If your file does not import at all, check these things first:
 
 - Is the CSV uploaded to the Files pane?
 - Did you put the file name in quotes?
 - Does the file name match exactly?
 - Did you include `.csv` at the end of the file name?
 - Are you working in the correct Posit Cloud project?
+
+**The harder problems are the ones where the file imports fine and the data are wrong.**
+Every one of these traces back to a rule from the bench card.
+
+| What you see in R | What went wrong in the sheet | The rule |
+|---|---|---|
+| A measurement column reads `chr` instead of `num` | Units or a note typed into a cell — `5.3 mm` instead of `5.3` | Units live in the header, never in a cell |
+| Column names come out as `X2.min` or `Time..min.` | Spaces, symbols, or a leading digit in the header | Lowercase headers, underscores, no spaces or symbols |
+| Three groups appear when you sampled two | `galled`, `Galled`, and `galled ` counted as separate values | Category labels spelled and capitalised identically |
+| More rows than stems you measured | An `AVERAGE` row exported along with the data | No summary rows inside the data table |
+| First row of data became the header | A merged title banner sat above the real header | No merged cells |
+| A mean comes out far lower than it should | A `0` was typed where the measurement was never taken | Blank for missing, `0` only for measured absence |
+| Nothing at all — R returns an HTML page | Sheet sharing was never set to *Anyone at Bucknell with the link can view* | Set the permission when the sheet is created |
+
+None of these produce an error message. That is why they matter.
 
 ---
 
@@ -513,16 +554,16 @@ R makes graphs with a package called **ggplot2**. Every ggplot is built from thr
 2. a **geom** layer, added with `+` — for a scatter plot, that's `geom_point()`
 3. (later) labels and styling
 
-Let's plot two columns from the soil data: **organic matter** on the x-axis and **respiration rate**
-on the y-axis. Soils richer in organic matter tend to "breathe" more, because organic matter feeds
-the microbes that release CO₂.
+Let's plot two columns from the goldenrod data: **stem width** on the x-axis and
+**number of inflorescence shoots** on the y-axis. Bigger stems generally support more
+flowering shoots, because a larger plant has more resources to allocate to reproduction.
 
 ### Your turn
 
 Finish this scatter plot by adding `geom_point()` with a `+`.
 
 ```{r first-plot, exercise=TRUE}
-ggplot(lab_data, aes(x = organic_matter_pct, y = respiration_rate_mg_co2_kg_hr))
+ggplot(lab_data, aes(x = stem_width_mm, y = n_inflorescence_shoots))
 ```
 
 ```{r first-plot-check}
@@ -532,22 +573,40 @@ grade_this({
   }
   geoms <- vapply(.result$layers, function(l) class(l$geom)[1], character(1))
   if ("GeomPoint" %in% geoms) {
-    pass("Your first graph in R! Each point is one soil sample — and you can see respiration climb as organic matter increases.")
+    pass("Your first graph in R! Each point is one stem — and you can see shoot number climb as stems get wider.")
   }
   fail("Add + geom_point() to draw the points.")
 })
 ```
 
-When you come back in the spring, you'll learn to label the axes and clean up the look. Here's a
-preview of where you're headed:
+### One more thing that figure is hiding
 
-```{r polished-preview, echo=TRUE, fig.width=5, fig.height=3.5}
-ggplot(lab_data, aes(x = organic_matter_pct, y = respiration_rate_mg_co2_kg_hr)) +
-  geom_point(color = "darkgreen", size = 2) +
-  labs(x = "Organic matter (%)",
-       y = "Respiration rate (mg CO2 / kg / hr)") +
+Every point on that plot is one stem, but half of those stems were galled and half were
+not. The figure treats them as one cloud. Colouring by `gall_status` splits them apart —
+and a second pattern appears that the first plot could not show you.
+
+Notice that this only works because `gall_status` is a column. If galled stems had been
+marked by shading the cells yellow instead, R would have no way to know which was which.
+
+```{r polished-preview, echo=TRUE, fig.width=5.5, fig.height=3.5}
+ggplot(lab_data, aes(x = stem_width_mm,
+                     y = n_inflorescence_shoots,
+                     color = gall_status)) +
+  geom_point(size = 2) +
+  labs(x = "Stem width (mm)",
+       y = "Inflorescence shoots (count)",
+       color = "Gall status") +
   theme_classic()
 ```
+
+At any given stem width, galled stems tend to sit lower on the plot. The gall is a resource
+sink: the larva inside is being fed by the plant, and that comes at a cost to flowering.
+
+Is that difference real, or could a pattern like it appear by chance? That is a question
+for a statistical test, not a figure — and it is one you will answer for yourself.
+
+When you come back in the spring, you'll learn to label the axes properly, control the
+colours, and reshape data between wide and long format.
 
 ---
 
@@ -559,10 +618,14 @@ You have covered:
 - ✅ Opening the correct lab section space
 - ✅ Creating a new RStudio Project
 - ✅ Opening and saving an R script
-- ✅ Uploading a CSV file
+- ✅ Exporting the right tab and uploading a CSV file
 - ✅ Importing data with `read.csv()`
 - ✅ Checking imported data with `head()`, `str()`, and `summary()`
+- ✅ Recognising the import problems that produce no error message
 - ✅ Making a simple scatter plot in `ggplot2`
+
+Everything above worked because the table was tidy before it reached R. The rules you
+followed at the bench are the reason the import took one line instead of an afternoon.
 
 You made your first graph today. When you return from winter break, **Module 3** picks up right
 here — you'll go further with figures and learn to reshape data with the tidyverse.

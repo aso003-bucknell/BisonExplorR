@@ -246,7 +246,7 @@ the interaction `nutrient_level:species`.
 head(algae)
 ```
 
-## Fit the two-way ANOVA
+## Fit the two-way ANOVA {data-allow-skip="true"}
 
 ### Exercise q1
 
@@ -324,7 +324,7 @@ against a cleaner baseline.
 That is the practical argument for a two-way design: it is not just two tests at
 once, it is two **more sensitive** tests.
 
-## Show both factors at once
+## Show both factors at once {data-allow-skip="true"}
 
 A two-way design needs a figure that shows *both* factors. Two work well: a
 **grouped boxplot** (raw distributions, split by both factors) and an

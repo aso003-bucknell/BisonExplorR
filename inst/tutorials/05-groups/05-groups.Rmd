@@ -262,7 +262,7 @@ question(
 )
 ```
 
-## Two groups: the t-test
+## Two groups: the t-test {data-allow-skip="true"}
 
 The t-test formula reads `response ~ group`.
 
@@ -353,7 +353,7 @@ question(
 )
 ```
 
-## Which groups differ? TukeyHSD
+## Which groups differ? TukeyHSD {data-allow-skip="true"}
 
 A significant ANOVA means *at least one* group stands out, not which one. Run
 **Tukey's Honest Significant Difference** on the fitted model to compare every

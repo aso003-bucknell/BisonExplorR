@@ -242,7 +242,7 @@ Notice the mismatch — it will matter a lot in a minute. **`sites`** lists P1�
 **`surveys`** has P1, P2, P3, and **P5**. So **P4 was never surveyed**, and **P5
 was surveyed but isn't in your site list**.
 
-## Stacking rows: `bind_rows()`
+## Stacking rows: `bind_rows()` {data-allow-skip="true"}
 
 When two tables describe the *same kind of thing* with the *same columns* — like
 two rounds of the same survey — you stack them into one longer table with
@@ -316,7 +316,7 @@ question(
 The lesson: reach for `bind_cols()` only when you're certain the rows line up.
 Whenever the tables share a key column, use a **join** instead — that's next.
 
-## Matching on a key: the joins
+## Matching on a key: the joins {data-allow-skip="true"}
 
 A **join** combines two tables by matching a shared **key** — here, `site_id`.
 The four joins differ in **one thing only**: *which rows do you keep when a key

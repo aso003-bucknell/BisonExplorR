@@ -189,7 +189,7 @@
 <code class="sourceCode R"><span><span class="fu">devtools</span><span class="fu">::</span><span class="fu"><a href="https://devtools.r-lib.org/reference/install.html" class="external-link">install</a></span><span class="op">(</span>upgrade <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span>
 <span><span class="fu">.rs.restartR</span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/source.html" class="external-link">source</a></span><span class="op">(</span><span class="st">"dev/preflight-module5.R"</span><span class="op">)</span></span></code></pre></div>
-<ul class="task-list"><li><label><input type="checkbox">Preflight still passes 45/45 with only the expected <code>coach_url</code> warning</label></li>
+<ul class="task-list"><li><label><input type="checkbox">Preflight passes <strong>39/40</strong> with only the expected <code>coach_url</code> warning. ⚠️ <strong>Not 45/45</strong> — that figure came from a copy of the script that was never committed; the repo version has 40 checks. The one FAIL, “registry object reachable”, appears only when <code>coach-endpoint/</code> is missing from the working folder — it is gitignored, so it never arrives with a fresh clone and must be copied across by hand.</label></li>
 <li><label><input type="checkbox">Spot-check one module from each group — M1 (CRLF, no coach) and M9 (LF, coach-wired) — to confirm both the banner and the ID box render</label></li>
 </ul></div>
 </div>

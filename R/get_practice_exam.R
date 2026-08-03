@@ -1,53 +1,50 @@
 #' Copy a practice exam's datasets into your project
 #'
-#' Practice exam datasets ship with BisonExplorR. They live inside the installed
-#' package, which is read-only, so this function copies them into your current
-#' Posit Cloud project where your code can read them.
+#' The practice R exams are written against a small set of CSV files. Those
+#' files ship inside the installed package, which is read-only, so this function
+#' copies them into your current Posit Cloud project where `read.csv()` can find
+#' them with a bare filename — exactly as it will on exam day.
 #'
-#' This deliberately mirrors how the real exam works. On exam day the CSVs are
-#' already sitting in your project folder, so your code reads them by bare
-#' filename:
+#' Call `get_practice_exam()` with no arguments to see which practice exams are
+#' available.
 #'
-#' \preformatted{
-#' turtles <- read.csv("turtle_growth.csv")
-#' }
+#' @param exam Name of the practice exam, e.g. `"exam1"` or `"exam2"`. If
+#'   `NULL`, the available practice exams are listed.
+#' @param overwrite Replace copies already in your project? Defaults to `FALSE`
+#'   so a second call never wipes out work in progress.
 #'
-#' Practising with \code{system.file()} instead would mean rehearsing a call you
-#' will not use on exam day, so this function puts the files where the exam
-#' expects them.
-#'
-#' Call \code{get_practice_exam()} with no arguments to see what is available.
-#'
-#' @param exam Name of the practice exam, e.g. \code{"exam2"}. If \code{NULL},
-#'   the available practice exams are listed.
-#' @param overwrite Replace files already in your project? Defaults to
-#'   \code{FALSE} so you never clobber work in progress.
-#'
-#' @return (Invisibly) the paths of the copied files, or the vector of available
-#'   practice exam names when \code{exam = NULL}.
+#' @return (Invisibly) a character vector of the paths copied, or the vector of
+#'   available exam names when `exam = NULL`.
 #' @export
+#'
+#' @details
+#' Only **practice** exam datasets are distributed this way. Real exam
+#' documents, answer keys, and their CSVs are instructor-controlled and are
+#' deliberately absent from the package — anything under `inst/` is readable by
+#' any student through [system.file()], so that boundary is enforced by
+#' placement rather than by convention.
+#'
+#' @seealso [get_lab()] for in-lab partner scripts.
 #'
 #' @examples
 #' \dontrun{
-#' get_practice_exam()          # list available practice exams
-#' get_practice_exam("exam2")   # copy exam 2's datasets into your project
+#' get_practice_exam()         # list available practice exams
+#' get_practice_exam("exam2")  # copy exam 2's datasets into your project
 #' }
 get_practice_exam <- function(exam = NULL, overwrite = FALSE) {
 
-  base_dir <- system.file("practice-exams", package = "BisonExplorR")
+  root <- system.file("practice-exams", package = "BisonExplorR")
 
-  if (!nzchar(base_dir) || !dir.exists(base_dir)) {
-    stop("No practice exams found in the package. ",
-         "Is BisonExplorR installed with its inst/practice-exams/ folder?",
-         call. = FALSE)
+  available <- if (nzchar(root)) {
+    sort(list.dirs(root, full.names = FALSE, recursive = FALSE))
+  } else {
+    character(0)
   }
 
-  available <- list.dirs(base_dir, full.names = FALSE, recursive = FALSE)
-  available <- available[nzchar(available)]
-
   if (length(available) == 0) {
-    stop("The practice-exams folder is empty. ",
-         "Reinstall BisonExplorR, or ask your instructor.", call. = FALSE)
+    stop("No practice exams found in the package.\n",
+         "Is BisonExplorR installed with its inst/practice-exams/ folder?",
+         call. = FALSE)
   }
 
   # No exam named -> show what's available and stop here.
@@ -60,44 +57,43 @@ get_practice_exam <- function(exam = NULL, overwrite = FALSE) {
   }
 
   if (!exam %in% available) {
-    stop("There is no practice exam called \"", exam, "\".\nAvailable: ",
-         paste(available, collapse = ", "), call. = FALSE)
-  }
-
-  src_dir <- file.path(base_dir, exam)
-  srcs    <- list.files(src_dir, pattern = "\\.csv$", full.names = TRUE)
-
-  if (length(srcs) == 0) {
-    stop("Practice exam \"", exam, "\" has no CSV files in the package.",
+    stop("There is no practice exam called \"", exam, "\".\n",
+         "Available practice exams: ", paste(available, collapse = ", "),
          call. = FALSE)
   }
 
-  dests  <- file.path(getwd(), basename(srcs))
-  exists <- file.exists(dests)
+  src_dir <- file.path(root, exam)
+  files   <- list.files(src_dir, pattern = "\\.csv$", full.names = TRUE)
 
-  # Refuse the whole copy rather than half of it -- a partial copy leaves the
-  # student with some fresh files and some stale ones, which is worse than
-  # either, and the failure would show up later as a confusing wrong answer.
-  if (any(exists) && !overwrite) {
-    stop("These files are already in your project:\n  ",
-         paste(basename(dests[exists]), collapse = "\n  "),
-         "\n\nIf you want to start over with fresh copies, run:\n  ",
+  if (length(files) == 0) {
+    stop("Practice exam \"", exam, "\" has no datasets to copy.", call. = FALSE)
+  }
+
+  dest <- file.path(getwd(), basename(files))
+
+  # Check every destination BEFORE copying any, so a collision never leaves
+  # the project half-populated.
+  clash <- dest[file.exists(dest)]
+  if (length(clash) > 0 && !overwrite) {
+    stop(paste(basename(clash), collapse = ", "),
+         if (length(clash) == 1) " is" else " are",
+         " already in your project.\n",
+         "If you want fresh copies, run:\n  ",
          "get_practice_exam(\"", exam, "\", overwrite = TRUE)", call. = FALSE)
   }
 
-  ok <- file.copy(srcs, dests, overwrite = overwrite)
+  ok <- file.copy(files, dest, overwrite = overwrite)
   if (!all(ok)) {
-    stop("Could not copy ", sum(!ok), " of ", length(ok),
-         " files. Check that you have write access to ", getwd(),
-         call. = FALSE)
+    stop("Could not copy ", sum(!ok), " of ", length(ok), " files. ",
+         "Check that you have write access to ", getwd(), call. = FALSE)
   }
 
-  message("Copied ", length(dests), " dataset",
-          if (length(dests) == 1) "" else "s",
-          " into your project:\n  ",
-          paste(basename(dests), collapse = "\n  "),
-          "\n\nRead them by filename, exactly as you will on exam day, e.g.\n  ",
-          "dat <- read.csv(\"", basename(dests)[1], "\")")
+  message("Copied ", length(dest), " dataset",
+          if (length(dest) == 1) "" else "s",
+          " for ", exam, " into your project:\n  ",
+          paste(basename(dest), collapse = "\n  "),
+          "\n\nLoad one with, for example:\n  ",
+          "d <- read.csv(\"", basename(dest)[1], "\")")
 
-  invisible(dests)
+  invisible(dest)
 }

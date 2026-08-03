@@ -7,39 +7,38 @@
 get_practice_exam(exam = NULL, overwrite = FALSE)
 }
 \arguments{
-\item{exam}{Name of the practice exam, e.g. \code{"exam2"}. If \code{NULL},
-the available practice exams are listed.}
+\item{exam}{Name of the practice exam, e.g. \code{"exam1"} or \code{"exam2"}. If
+\code{NULL}, the available practice exams are listed.}
 
-\item{overwrite}{Replace files already in your project? Defaults to
-\code{FALSE} so you never clobber work in progress.}
+\item{overwrite}{Replace copies already in your project? Defaults to \code{FALSE}
+so a second call never wipes out work in progress.}
 }
 \value{
-(Invisibly) the paths of the copied files, or the vector of available
-practice exam names when \code{exam = NULL}.
+(Invisibly) a character vector of the paths copied, or the vector of
+available exam names when \code{exam = NULL}.
 }
 \description{
-Practice exam datasets ship with BisonExplorR. They live inside the installed
-package, which is read-only, so this function copies them into your current
-Posit Cloud project where your code can read them.
+The practice R exams are written against a small set of CSV files. Those
+files ship inside the installed package, which is read-only, so this function
+copies them into your current Posit Cloud project where \code{read.csv()} can find
+them with a bare filename — exactly as it will on exam day.
 }
 \details{
-This deliberately mirrors how the real exam works. On exam day the CSVs are
-already sitting in your project folder, so your code reads them by bare
-filename:
+Call \code{get_practice_exam()} with no arguments to see which practice exams are
+available.
 
-\preformatted{
-turtles <- read.csv("turtle_growth.csv")
-}
-
-Practising with \code{system.file()} instead would mean rehearsing a call you
-will not use on exam day, so this function puts the files where the exam
-expects them.
-
-Call \code{get_practice_exam()} with no arguments to see what is available.
+Only \strong{practice} exam datasets are distributed this way. Real exam
+documents, answer keys, and their CSVs are instructor-controlled and are
+deliberately absent from the package — anything under \verb{inst/} is readable by
+any student through \code{\link[=system.file]{system.file()}}, so that boundary is enforced by
+placement rather than by convention.
 }
 \examples{
 \dontrun{
-get_practice_exam()          # list available practice exams
-get_practice_exam("exam2")   # copy exam 2's datasets into your project
+get_practice_exam()         # list available practice exams
+get_practice_exam("exam2")  # copy exam 2's datasets into your project
 }
+}
+\seealso{
+\code{\link[=get_lab]{get_lab()}} for in-lab partner scripts.
 }
