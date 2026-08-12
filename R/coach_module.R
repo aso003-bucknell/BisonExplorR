@@ -20,10 +20,24 @@
     ".bx-msg-student{align-self:flex-end;background:#12324F;color:#fff;",
     "border-bottom-right-radius:3px;}",
     ".bx-coach-input{border-top:1px solid #E2DDD2;padding:12px 14px;}",
+    # Every property declared explicitly. These rules previously set background
+    # and border-color only, inheriting color/padding/border-width from
+    # whatever Bootstrap the tutorial happened to load -- and .btn-default was
+    # REMOVED in Bootstrap 4, so under bslib it styled nothing at all. Result:
+    # "I'm stuck" rendered with no button chrome and "Ask the coach" rendered
+    # with unreadable text. Do not trim these back to the shorthand.
+    #
+    # Colour is #B55A14, the functional orange, NOT the #C0602A this card used
+    # to use: #C0602A is 4.24:1 on white and fails AA in BOTH directions.
+    # #B55A14 is 4.73:1. See the contrast table in the seed.
     ".bx-coach-actions{display:flex;gap:8px;align-items:center;}",
-    ".bx-coach-actions .btn{border-radius:8px;font-weight:600;}",
-    ".bx-coach-actions .btn-default{border-color:#C0602A;color:#C0602A;background:#fff;}",
-    ".bx-coach-actions .btn-primary{background:#C0602A;border-color:#C0602A;flex:1;}",
+    ".bx-coach-actions .btn{border-radius:8px;font-weight:600;font-size:14px;",
+    "padding:7px 14px;line-height:1.4;cursor:pointer;}",
+    ".bx-coach-actions .btn-default{background:#fff;color:#B55A14;",
+    "border:1px solid #B55A14;}",
+    ".bx-coach-actions .btn-primary{background:#B55A14;color:#fff;",
+    "border:1px solid #B55A14;flex:1;}",
+    ".bx-coach-actions .btn[disabled]{opacity:.55;cursor:not-allowed;}",
     ".bx-mode{display:inline-block;border-radius:20px;padding:2px 7px;margin-left:5px;",
     "background:#F3E4D6;color:#9A461D;font-weight:700;text-transform:uppercase;",
     "letter-spacing:.45px;font-size:10px;}"

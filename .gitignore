@@ -12,3 +12,6 @@ coach-endpoint/
 desktop.ini
 .Rproj.user/
 exams/
+demo-app/*.html
+demo-app/*_files/
+demo-app/rsconnect/

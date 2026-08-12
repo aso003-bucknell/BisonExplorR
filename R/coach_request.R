@@ -130,6 +130,29 @@
 # ---------------------------------------------------------------------------
 .bx_offline_nudges <- list(
 
+  "module1-q1" = list(
+    blank = paste(
+      "The exercise wants one column out of a dataframe, not the whole thing.",
+      "Two pieces have to appear: the name of the dataframe, and the name of",
+      "the column. What operator did the worked example just above put between",
+      "them?"
+    ),
+    stuck = paste(
+      "Check three things in order. First, is the dataframe named exactly as it",
+      "appears in the reminder -- R is case-sensitive and will not guess.",
+      "Second, is the column name spelled exactly as `str()` printed it,",
+      "including the unit suffix. Third, is the dataframe on the left of the",
+      "operator and the column on the right? Which of those three are you least",
+      "sure about?"
+    ),
+    done = paste(
+      "That worked. Notice what came back: a bare vector of numbers, not a",
+      "one-column table. That distinction matters later -- most statistical",
+      "functions in R want a vector for a single measurement and a dataframe",
+      "when they need to see several columns at once. Which of those do you",
+      "think a t-test needs?"
+    )
+  ),
   "module4-q5" = list(
     blank = "You need one row per group, not one row per animal. Which pair of verbs collapses a dataset that way?",
     stuck = "Check the standard error itself: it is the standard deviation divided by the square root of the group size. House style uses length() for that count.",
@@ -325,3 +348,4 @@ coach_request <- function(
     mode = "online"
   )
 }
+

@@ -26,6 +26,8 @@
 # inst/tutorials/ appears in students' Tutorial pane; dev/ is where those live
 # instead.
 ^dev$
+# The public demo app bundle. Deployed to shinyapps.io, not part of the package.
+^demo-app$
 
 # --- Never ship: environment and credentials --------------------------------
 # The graded-mode flag belongs in the DEPLOYED APP BUNDLE only. If a .Renviron

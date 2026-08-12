@@ -1,0 +1,577 @@
+---
+title: "BisonExplorR — Try a Tutorial"
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+    css: custom.css
+runtime: shiny_prerendered
+description: "A public, ungraded demonstration of a BisonExplorR module. Nothing is recorded."
+---
+
+```{r setup, include=FALSE}
+# =========================================================================
+# PUBLIC DEMO COPY -- forked from inst/tutorials/01-data-import/ on
+# 2026-08-12. This file is deployed to a PUBLIC URL linked from the pkgdown
+# site. It is NOT the graded Module 1 and must never be swapped for it.
+#
+# WHAT WAS REMOVED, AND WHY IT MUST STAY REMOVED:
+#   * log_attempt(), bx_is_graded(), bx_get_sid()
+#   * the event_register_handler("exercise_result", ...) chunk
+#   * the student-ID box, its server chunk, and the Continue-button gate
+#   * the "Mark as Complete" button (it called log_attempt)
+#
+# These were deleted OUTRIGHT rather than left to fail safe at runtime.
+# log_attempt() does return early when bx_is_graded() is FALSE, but that is
+# a runtime flag, and this app is public. If BISONEXPLORR_GRADED ever
+# reached this bundle, anonymous strangers would POST into the Google Form
+# backing the IRB-covered dataset. There is no handler here to fire, so
+# that failure is structurally impossible rather than conditionally avoided.
+#
+# DEPLOY CHECKLIST (all three must be true):
+#   1. NO .Renviron / Rprofile.site setting BISONEXPLORR_GRADED
+#   2. NO .Renviron / Rprofile.site setting BISONEXPLORR_COACH_URL
+#      -- if set, the Coach silently flips from "pilot" to "online" and
+#         public traffic starts billing the Anthropic API key. Same class
+#         of silent-mode-flip bug as the GRADED flag. Check for BOTH.
+#   3. Bundle includes custom.css AND images/posit1.png
+# =========================================================================
+
+library(learnr)
+library(shiny)
+library(gradethis)
+
+gradethis_setup()
+
+tutorial_options(
+  exercise.checker = gradethis::grade_learnr,
+  exercise.completion = TRUE
+)
+
+# Package dataset -- always available
+goldenrod <- read.csv(system.file("extdata", "goldenrod_data.csv", package = "BisonExplorR"))
+```
+
+
+## Welcome to R
+
+R is a programming language built for working with data. You have spent this semester
+organising observations into tidy tables — one row per observation, one column per
+variable, units in the header, categories spelled the same way every time. This module is
+where you find out what those rules were *for*.
+
+R cannot look at a spreadsheet and work out what you meant. It reads the structure
+literally. A tidy table imports in one line and is immediately usable. An untidy one
+imports as something that looks almost right and then gives you wrong answers without
+complaining. The rules were never about neatness.
+
+In this module you will meet RStudio, write your first R code, and explore a dataset you
+already know — goldenrod stems, galled and ungalled, measured in the field.
+
+By the end of this module, you should be able to:
+
+- Identify the four main panes in RStudio
+- Explain the difference between the Source pane and Console
+- Assign a value to an object using `<-`
+- Identify numeric, character, and logical data types
+- Use `head()`, `str()`, and `summary()` to explore a dataframe
+- Access a single column using `$`
+
+:::: {style="background-color: #F2F4F7; border-left: 4px solid #001930; padding: 12px 16px; margin-bottom: 16px;"}
+**This is a public demonstration.** Nothing you type here is recorded, and this
+copy is not connected to any course. Work through it at whatever pace you like,
+and use **Next Topic** to skip past anything you would rather not attempt.
+
+This is one of ten modules in **BisonExplorR**, an R package written for the
+introductory biology laboratory sequence at Bucknell University. The other nine
+cover data wrangling, visualisation, and the statistical tests students meet
+across the two-course sequence. To install the full package:
+
+```
+remotes::install_github("aso003-bucknell/BisonExplorR")
+```
+::::
+
+
+
+------------------------------------------------------------------------
+
+## The RStudio Interface
+
+When you open RStudio, you will see four panes:
+
+**Source** — where you write and save R scripts
+
+**Console** — where R runs your code and prints output
+
+**Environment** — where you see objects you have created
+
+**Files / Plots / Packages / Help / Viewer** — where you browse files, view plots, manage packages, and access help
+
+![](images/posit1.png){width="100%"}
+
+You will type most of your code in the **Source** pane and run it line by line. In this tutorial, the code boxes work in a similar way: write your code, click **Run Code** to test it, and click **Submit Answer** to check it.
+
+### Check your understanding
+
+```{r panes-quiz-check, echo=FALSE}
+quiz(
+  caption = "",
+  question("Where does R display a plot after you run plotting code?",
+    answer("Source pane"),
+    answer("Console pane"),
+    answer("Plots pane", correct = TRUE, message = "Correct — plots appear in the Plots pane."),
+    answer("Environment pane"),
+    allow_retry = TRUE
+  )
+)
+```
+
+------------------------------------------------------------------------
+
+## Objects and Assignment
+
+In R, you store values using the assignment operator `<-`. The result is called an **object**.
+
+```{r assign-demo, exercise=FALSE, echo=TRUE}
+quadrat_name <- "Old field, quadrat 3"
+quadrat_name
+```
+
+The object `quadrat_name` now stores the value `"Old field, quadrat 3"`. You can also see it appear in the Environment pane.
+
+### Your turn
+
+In the field you sampled goldenrod in **neighbour-matched pairs** — each galled stem
+recorded alongside an ungalled stem growing beside it. The practice dataset holds 15 such
+pairs.
+
+Create an object called `num_pairs` and assign it the value `15`.
+
+```{r assign-exercise, exercise=TRUE}
+# Create your object below
+
+```
+
+```{r assign-exercise-check}
+grade_this({
+  pass_if(
+    user_object_exists("num_pairs") &&
+      identical(user_object_get("num_pairs"), 15),
+    "Correct — `num_pairs` is now 15. Keep that number in mind: 15 pairs, but 30 stems."
+  )
+
+  fail_if(
+    !user_object_exists("num_pairs"),
+    "Try again. Create an object called `num_pairs`."
+  )
+
+  fail_if(
+    user_object_exists("num_pairs") &&
+      !identical(user_object_get("num_pairs"), 15),
+    "Try again. `num_pairs` exists, but it should be assigned the value 15."
+  )
+
+  fail("Use `<-` to assign the value 15 to an object called `num_pairs`.")
+})
+```
+
+------------------------------------------------------------------------
+
+## Data Types in R
+
+R recognizes several types of data. Three common types are:
+
+| Type | Description | Example |
+|------------------|--------------------------------|----------------------|
+| `numeric` | Numbers, including measurements and counts | `8.5`, `12` |
+| `character` | Text, usually written in quotes | `"galled"`, `"P7U"` |
+| `logical` | TRUE or FALSE values | `TRUE`, `FALSE` |
+
+You can check what type an object is using `class()`.
+
+Type matters more than it sounds like it should. If one stem width was typed as `8.5 mm`
+instead of `8.5`, R reads that whole column as character, and every mean you calculate
+from it fails. This is the reason units belong in the header and never in the cell.
+
+#### Try it: `class()`
+
+Run the code below to see the class of each example.
+
+```{r class-demo, exercise=TRUE}
+class(3.14)
+class("hello")
+class(TRUE)
+```
+
+```{r class-demo-check}
+grade_this({
+  pass_if(
+    identical(.result, "logical"),
+    "Correct — you ran the `class()` examples."
+  )
+
+  fail("Run the code as written to see the class of each example.")
+})
+```
+
+### Check your understanding
+
+```{r types-quiz-check, echo=FALSE}
+quiz(
+  caption = "",
+  question('A column containing the values "galled" and "ungalled" would be what data type in R?',
+    answer("numeric"),
+    answer("logical"),
+    answer("character", correct = TRUE, message = 'Correct. Text values are stored as the character type.'),
+    allow_retry = TRUE
+  ),
+  question('One student typed stem widths as "5.3 mm" instead of 5.3. What happens to that column in R?',
+    answer("R strips the units automatically"),
+    answer("R reads the whole column as character, so it cannot be averaged", correct = TRUE,
+           message = "Correct. One bad cell changes the type of the entire column, and nothing warns you."),
+    answer("R reads it as numeric and ignores the letters"),
+    answer("R refuses to import the file"),
+    allow_retry = TRUE
+  )
+)
+```
+
+------------------------------------------------------------------------
+
+## Working with a Dataframe
+
+A **dataframe** is R's version of a spreadsheet. It has rows and columns.
+
+In this tutorial, a goldenrod dataset is already loaded for you as an object called
+`goldenrod`. It holds 15 neighbour-matched pairs — 30 stems in total — with stem width,
+gall diameter, and a count of inflorescence shoots for each stem.
+
+This is a long, tidy table: **one row per stem**, one column per variable. It is the shape
+your own field sheet was designed to produce.
+
+### Confirm the data loaded
+
+Run the line below. You should see `"data.frame"`, which means `goldenrod` is stored as a dataframe.
+
+```{r confirm-load, exercise=TRUE}
+class(goldenrod)
+```
+
+```{r confirm-load-check}
+grade_this({
+  pass_if(
+    identical(.result, "data.frame"),
+    "Good — you ran the check."
+  )
+
+  fail("Run `class(goldenrod)` to check that the dataset is available.")
+})
+```
+
+------------------------------------------------------------------------
+
+## Exploring a Dataframe
+
+Once you have a dataframe, the first thing to do is look at it. Three functions are especially useful.
+
+#### `head()` - see the first six rows
+
+```{r head-exercise, exercise=TRUE}
+# Use head() on the goldenrod dataset
+
+```
+
+```{r head-exercise-check}
+grade_this({
+  pass_if(
+    identical(.result, head(goldenrod)),
+    "Correct — `head(goldenrod)` shows the first six rows. Notice the rows come in pairs: each galled stem sits next to its matched neighbour."
+  )
+
+  fail("Try again. Use `head(goldenrod)` to view the first six rows.")
+})
+```
+
+#### `str()` - see the structure
+
+`str()` shows the variable names, data types, and a preview of the values.
+
+```{r str-exercise, exercise=TRUE}
+# Use str() on the goldenrod dataset
+
+```
+
+```{r str-exercise-check}
+grade_this({
+  pass_if(
+    grepl("str\\s*\\(\\s*goldenrod\\s*\\)", .user_code),
+    "Correct — `str(goldenrod)` shows the structure of the dataset."
+  )
+
+  fail("Try again. Use `str(goldenrod)` to inspect the dataset structure.")
+})
+```
+
+#### `summary()` - see summary information
+
+```{r summary-exercise, exercise=TRUE}
+# Use summary() on the goldenrod dataset
+
+```
+
+```{r summary-exercise-check}
+grade_this({
+  pass_if(
+    identical(.result, summary(goldenrod)),
+    "Correct — `summary(goldenrod)` gives summary information for each variable. Look at the bottom of the gall_diameter_mm column."
+  )
+
+  fail("Try again. Use `summary(goldenrod)` to summarize the dataset.")
+})
+```
+
+### What `summary()` just told you about missing data
+
+Look again at the `gall_diameter_mm` column in your `summary()` output. Underneath the
+quartiles there is a line reading `NA's : 15`.
+
+That is not an error. Fifteen of the thirty stems are ungalled, and an ungalled stem has
+no gall to measure. Those cells were left **blank** in the source file, and R read a blank
+cell as `NA` — "not available."
+
+This is the reason for the rule you followed in lab: a blank cell means *not measured*, and
+a `0` means *measured, and the answer was none*. If someone had typed `0` into those
+fifteen cells instead, R would have happily averaged them in and reported a mean gall
+diameter roughly half its true value — with no warning of any kind.
+
+```{r na-quiz-check, echo=FALSE}
+quiz(
+  caption = "",
+  question("A student counted inflorescence shoots on a stem and found none. What belongs in the `n_inflorescence_shoots` cell?",
+    answer("Leave it blank"),
+    answer("0", correct = TRUE,
+           message = "Correct. The measurement was taken and the answer was zero. That is data, and it must not become NA."),
+    answer("NA"),
+    answer("A dash"),
+    allow_retry = TRUE
+  ),
+  question("A stem snapped before it could be measured. What belongs in the cell?",
+    answer("0"),
+    answer("Leave it blank, and give the reason in a notes column", correct = TRUE,
+           message = "Correct. R reads a blank as NA, which is exactly right — and the notes column records why, so it can be recovered later."),
+    answer("The group average"),
+    answer("A dash"),
+    allow_retry = TRUE
+  )
+)
+```
+
+------------------------------------------------------------------------
+
+### Reading `str()` Output
+
+`str()` is one of the most useful functions you will use. Let's practice reading its output.
+
+#### Run `str(goldenrod)`
+
+Run `str(goldenrod)` once more, then answer the questions that follow.
+
+```{r str-review, exercise=TRUE}
+str(goldenrod)
+```
+
+```{r str-review-check}
+grade_this({
+  pass_if(
+    grepl("str\\s*\\(\\s*goldenrod\\s*\\)", .user_code),
+    "Correct — now use the output to answer the questions that follow."
+  )
+
+  fail("Try again. Run `str(goldenrod)`.")
+})
+```
+
+### Data Structure Quiz
+
+```{r str-quiz-1-check, echo=FALSE}
+quiz(
+  caption = "",
+  question("Question 1: How many observations (rows) does the goldenrod dataset have?",
+    answer("8"),
+    answer("15", message = "15 is the number of pairs. Each pair contributes two stems, and one row is one stem."),
+    answer("30", correct = TRUE, message = "Correct! The top line indicates there are 30 observations — 15 pairs, two stems each."),
+    answer("60"),
+    allow_retry = TRUE
+  ),
+  question("Question 2: In your str(goldenrod) output, what data type is the gall_status variable?",
+    answer("numeric"),
+    answer("logical"),
+    answer("character", correct = TRUE, message = "Correct! It is listed as a character (chr) variable."),
+    allow_retry = TRUE
+  ),
+  question("Question 3: What data type is stem_width_mm?",
+    answer("character"),
+    answer("logical"),
+    answer("numeric", correct = TRUE, message = "Correct! In str() output, numeric variables usually appear as 'num'."),
+    allow_retry = TRUE
+  ),
+  question("Question 4: Why does the dataset need a pair_id column at all?",
+    answer("To count how many stems were sampled"),
+    answer("To record which galled stem was matched with which ungalled neighbour", correct = TRUE,
+           message = "Correct. Without pair_id the matching you did in the field is lost, and the wrong statistical test runs silently."),
+    answer("To sort the rows alphabetically"),
+    answer("It is not needed; R can work it out"),
+    allow_retry = TRUE
+  )
+)
+```
+
+------------------------------------------------------------------------
+
+## Accessing Individual Variables
+
+You can pull out a single column from a dataframe using the `$` operator.
+
+### The `$` operator
+
+Run the line below to pull out the `gall_status` column.
+
+```{r dollar-demo, exercise=TRUE}
+goldenrod$gall_status
+```
+
+```{r dollar-demo-check}
+grade_this({
+  pass_if(
+    identical(.result, goldenrod$gall_status),
+    "Correct — `goldenrod$gall_status` pulls out the `gall_status` column. Every value reads either galled or ungalled, spelled identically. That is not luck."
+  )
+
+  fail("Run `goldenrod$gall_status` to access the `gall_status` column.")
+})
+```
+
+Every value in that column is either `galled` or `ungalled`, spelled and capitalised the
+same way every time. If a few rows read `Galled` or `un-galled`, R would treat them as
+additional, separate groups — and a comparison of two groups would quietly become a
+comparison of four.
+
+### Your turn
+
+Use `$` to access the `stem_width_mm` column.
+
+```{r dollar-exercise, exercise=TRUE}
+# Access the stem_width_mm column from the goldenrod data
+
+```
+
+```{r dollar-exercise-check}
+# COACHED EXERCISE -- the feedback below deliberately NAMES THE PROBLEM without
+# supplying the expression. The Coach card sits directly beneath this chunk, and
+# a fail() that hands over `goldenrod$stem_width_mm` makes the Coach pointless:
+# the student already has the answer before they ever click "I'm stuck".
+#
+# This applies BY HAND the same standard .bx_coach_reply_is_unsafe() enforces on
+# the Coach's own replies -- no fenced code, no assignments, no paste-ready
+# calls. gradethis feedback is NOT scanned automatically. Any coached exercise
+# needs this checked by eye.
+grade_this({
+  pass_if(
+    identical(.result, goldenrod$stem_width_mm),
+    "Correct — and note what came back: a plain vector of numbers, not a one-column table."
+  )
+
+  fail_if(
+    is.data.frame(.result),
+    "That returned the whole dataframe rather than a single column. You need the operator that reaches inside it."
+  )
+
+  fail_if(
+    identical(.result, goldenrod$gall_status),
+    "The operator is right, but that is the wrong column. Check the name against the prompt."
+  )
+
+  fail_if(
+    identical(.result, goldenrod$n_inflorescence_shoots),
+    "Right operator, wrong column. Reread the prompt for which measurement it asked for."
+  )
+
+  fail("Not quite. Three pieces have to be right: the dataframe name, the access operator from the example above, and the exact column name from the prompt. If you are not sure which of the three is wrong, ask the Coach below.")
+})
+```
+
+
+
+```{r coach-dollar-ui, echo=FALSE}
+BisonExplorR::coach_ui("coach_demo", "Stuck? Ask the Coach")
+```
+
+
+```{r coach-dollar-server, context="server"}
+# REGISTRY KEY IS "module1-q1" -- deliberately, even though the exercise chunk
+# is labelled `dollar-exercise`. The chunk label, the tutorial_id, and the
+# registry key are three independent namespaces. The third argument here is the
+# REGISTRY key and must match a name in .bx_offline_nudges (hyphenated, never
+# underscored). An unknown key does not error -- it falls through to generic
+# text, which is exactly the kind of silent degradation this demo must avoid.
+#
+# NO endpoint is configured on this deployment, so coach_request() returns
+# before its httr::POST and serves a deterministic local hint. That is the
+# whole reason a public Coach is safe here: no key, no network call, no spend.
+BisonExplorR::coach_server(
+  "coach_demo",
+  shiny::reactive(learnr::get_tutorial_state("dollar-exercise")),
+  "module1-q1"
+)
+```
+
+```{r coach-debug, context="server"}
+# TEMPORARY DIAGNOSTIC -- remove before deploying.
+shiny::observe({
+  st <- learnr::get_tutorial_state("dollar-exercise")
+  cat("\n---- tutorial state ----\n")
+  cat("names:", paste(names(st), collapse = ", "), "\n")
+  utils::str(st)
+})
+```
+
+The Coach reads your **submitted** code, not whatever is currently in the box —
+click *Submit Answer* first, then ask. It will not hand you the answer; it is
+built to ask you the next useful question instead.
+
+
+------------------------------------------------------------------------
+
+## Module 1 Complete
+
+You have covered:
+
+- ✅ Navigating the RStudio interface
+- ✅ Understanding the Source pane, Console, Environment, and Files / Plots / Help pane
+- ✅ Creating objects with `<-`
+- ✅ Identifying basic data types
+- ✅ Exploring a dataframe with `head()`, `str()`, and `summary()`
+- ✅ Reading basic `str()` output
+- ✅ Accessing columns with `$`
+
+Everything you just did worked in one line because the table was tidy before it reached R.
+That is the whole point of the rules.
+
+```{r finish-button, echo=FALSE}
+actionButton("finish_btn", "Mark as Complete",
+             style = "background-color: #001930; color: white; padding: 8px 20px;")
+
+renderText({
+  if (input$finish_btn > 0) {
+    "\u2705 Demo complete. Nothing was recorded \u2014 this copy is not connected to a course."
+  }
+})
+```
+
+
+**Module 2** will show you how to set up your own Posit Cloud project and import a data file — including, eventually, your own.
+
+```{r, echo=FALSE}
+# Hide previous button on final topic
+```
