@@ -406,7 +406,7 @@ quiz(
   question('A column containing the values "galled" and "ungalled" would be what data type in R?',
     answer("numeric"),
     answer("logical"),
-    answer("character", correct = TRUE, message = 'Correct. Text values are stored as the character type.'),
+    answer("character", correct = TRUE, message = 'Text values are stored as the character type.'),
     allow_retry = TRUE
   ),
   question('One student typed stem widths as "5.3 mm" instead of 5.3. What happens to that column in R?',
