@@ -395,7 +395,7 @@ The object name goes on the left side of `<-`. The file name goes inside quotati
 ## Practice: Import a CSV
 
 For this practice exercise, you will import a CSV file that is included with the course package.
-It holds 15 neighbour-matched pairs of goldenrod stems — the same data you explored in Module 1.
+It holds 15 neighbor-matched pairs of goldenrod stems — the same data you explored in Module 1.
 
 Run the code below.
 
@@ -621,7 +621,7 @@ You have covered:
 - ✅ Exporting the right tab and uploading a CSV file
 - ✅ Importing data with `read.csv()`
 - ✅ Checking imported data with `head()`, `str()`, and `summary()`
-- ✅ Recognising the import problems that produce no error message
+- ✅ Recognizing the import problems that produce no error message
 - ✅ Making a simple scatter plot in `ggplot2`
 
 Everything above worked because the table was tidy before it reached R. The rules you

@@ -483,7 +483,7 @@ save to an object cannot be combined later.**
 
 ### Your turn
 
-Combine `plot_pooled` and `plot_ancova` into one figure, labelled **A** and **B**.
+Combine `plot_pooled` and `plot_ancova` into one figure, labeled **A** and **B**.
 
 ```{r q4, exercise=TRUE}
 plot_grid(___, ___, labels = ___)
@@ -512,7 +512,7 @@ grade_this({
   if (!grepl('labels\\s*=\\s*c\\(', code)) {
     fail('labels takes a vector — write labels = c("A", "B"), not a single string.')
   }
-  pass("Two panels, labelled. That figure is the whole ANCOVA argument in one image.")
+  pass("Two panels, labeled. That figure is the whole ANCOVA argument in one image.")
 })
 ```
 
@@ -544,7 +544,7 @@ panels come out squeezed.
 - Its figure is **one regression line per group**
 - The only thing separating it from a **two-way ANOVA** is that the second predictor is a **measurement**, not a factor
 - Before trusting it, check **homogeneity of slopes** with `covariate * factor`; you want that interaction to be **non-significant**
-- Combine figures into one labelled panel with **`plot_grid()`** (cowplot), and save it with `ggsave()`
+- Combine figures into one labeled panel with **`plot_grid()`** (cowplot), and save it with `ggsave()`
 
 Next up is **Module 9**, a capstone that mixes every test you've met — given a biological question,
 which one do you reach for?

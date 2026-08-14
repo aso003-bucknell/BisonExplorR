@@ -186,7 +186,7 @@ shiny::observeEvent(input$sid, {
 
 Work through each section in order — a **Continue** button appears once you answer correctly.
 
-In Module 1 you imported the soil dataset and learned to inspect it with `head()`, `str()`, and
+In Module 2 you imported a CSV of goldenrod data and learned to inspect it with `head()`, `str()`, and
 `summary()`. This module picks up right there: now that you can *load* a dataset, you'll learn to
 *reshape* it and *plot* it — the two skills you'll use in almost every 204 lab.
 

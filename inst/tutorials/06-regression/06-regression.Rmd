@@ -215,7 +215,7 @@ took up. Hold onto that; it matters later.
 
 By the end of this module you should be able to:
 
-- Recognise when a question needs a regression rather than a group comparison
+- Recognize when a question needs a regression rather than a group comparison
 - Fit a linear model with `lm()` and read its `summary()`
 - Say what the **slope**, the **intercept**, the **R^2^**, and the **p-value** each mean
 - Report a regression result the way a biologist would

@@ -256,7 +256,7 @@ The object `quadrat_name` now stores the value `"Old field, quadrat 3"`. You can
 
 ### Your turn
 
-In the field you sampled goldenrod in **neighbour-matched pairs** — each galled stem
+In the field you sampled goldenrod in **neighbor-matched pairs** — each galled stem
 recorded alongside an ungalled stem growing beside it. The practice dataset holds 15 such
 pairs.
 
@@ -358,7 +358,7 @@ quiz(
 A **dataframe** is R's version of a spreadsheet. It has rows and columns.
 
 In this tutorial, a goldenrod dataset is already loaded for you as an object called
-`goldenrod`. It holds 15 neighbour-matched pairs — 30 stems in total — with stem width,
+`goldenrod`. It holds 15 neighbor-matched pairs — 30 stems in total — with stem width,
 gall diameter, and a count of inflorescence shoots for each stem.
 
 This is a long, tidy table: **one row per stem**, one column per variable. It is the shape
@@ -400,7 +400,7 @@ Once you have a dataframe, the first thing to do is look at it. Three functions 
 grade_this({
   pass_if(
     identical(.result, head(goldenrod)),
-    "Correct — `head(goldenrod)` shows the first six rows. Notice the rows come in pairs: each galled stem sits next to its matched neighbour."
+    "Correct — `head(goldenrod)` shows the first six rows. Notice the rows come in pairs: each galled stem sits next to its matched neighbor."
   )
 
   fail("Try again. Use `head(goldenrod)` to view the first six rows.")
@@ -532,7 +532,7 @@ quiz(
   ),
   question("Question 4: Why does the dataset need a pair_id column at all?",
     answer("To count how many stems were sampled"),
-    answer("To record which galled stem was matched with which ungalled neighbour", correct = TRUE,
+    answer("To record which galled stem was matched with which ungalled neighbor", correct = TRUE,
            message = "Correct. Without pair_id the matching you did in the field is lost, and the wrong statistical test runs silently."),
     answer("To sort the rows alphabetically"),
     answer("It is not needed; R can work it out"),
@@ -639,7 +639,7 @@ observeEvent(input$finish_btn, {
 })
 ```
 
-**Module 2** will show you how to set up your own Posit Cloud project and import a data file — including, eventually, your own.
+**Module 2** will show you how to import a data file with `read.csv()` — starting with the goldenrod data you just explored, and eventually your own.
 
 ```{r, echo=FALSE}
 # Hide previous button on final topic
