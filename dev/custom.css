@@ -35,6 +35,8 @@
   opacity: 0.5;
 }
 
+
+
 /* Start Over lives in .topicsFooter, outside .nav-pills, so it is
    unaffected by the rule above. Left deliberately clickable. */
 
@@ -54,3 +56,6 @@
    some other route backward.
    --------------------------------------------------------------------- */
 
+/* learnr paints a topicProgress.png sprite as the <li> background. */
+/* With the sidebar inert it reads as clutter.                     */
+.topicsList .nav-pills .topic { background-image: none; }

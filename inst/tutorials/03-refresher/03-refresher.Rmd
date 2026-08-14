@@ -19,6 +19,9 @@ editor_options:
 /* Disabling the <li>, not the <a>: the <nav> is a shiny-bound-input */
 /* that delegates clicks, so an inert <a> just passes the click up.  */
 .topicsList .nav-pills .topic { pointer-events: none; }
+/* learnr paints a topicProgress.png sprite as the <li> background. */
+/* With the sidebar inert it reads as clutter.                     */
+.topicsList .nav-pills .topic { background-image: none; }
 .topicsList .nav-pills .topic:not(.current) > .nav-link { opacity: 0.5; }
 
 /* Start Over sits in .topicsFooter, outside .nav-pills, so it stays */
