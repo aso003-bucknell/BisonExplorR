@@ -20,7 +20,7 @@ root <- "inst/tutorials"
 if (!dir.exists(root)) stop("Run me from the package root — ", root, " not found.")
 
 ## Target layout: folder name == .Rmd basename.
-targets <- c("01-data-import", "02-posit-cloud", "03-refresher",
+targets <- c("01-intro-to-r", "02-data-import", "03-refresher",
              "04-wrangle-visualize", "05-groups", "06-regression",
              "07-two-way-anova", "08-ancova", "09-choosing-a-test",
              "10-joining-data")

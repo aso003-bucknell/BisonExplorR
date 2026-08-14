@@ -1,5 +1,5 @@
 ---
-title: "Module 2: Posit Cloud and Importing Data"
+title: "Module 2: Data Import"
 output:
   learnr::tutorial:
     progressive: true

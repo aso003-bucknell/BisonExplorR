@@ -97,7 +97,7 @@ event_register_handler("exercise_result", function(session, event, data) {
 ## Welcome to R
 
 R is a programming language built for working with data. You have spent this semester
-organising observations into tidy tables — one row per observation, one column per
+organizing observations into tidy tables — one row per observation, one column per
 variable, units in the header, categories spelled the same way every time. This module is
 where you find out what those rules were *for*.
 

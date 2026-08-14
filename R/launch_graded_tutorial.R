@@ -37,8 +37,8 @@ launch_graded_tutorial <- function(module = NULL) {
   # Names are tutorial_id values. NEVER change a name: every row already logged
   # carries that string, and grade_module() matches it literally.
   graded_urls <- c(
-    module1  = NA_character_,   # 01-data-import
-    module2  = NA_character_,   # 02-posit-cloud
+    module1  = NA_character_,   # 01-intro-to-r
+    module2  = NA_character_,   # 02-data-import
     module3  = NA_character_,   # 03-refresher
     module4  = NA_character_,   # 04-wrangle-visualize
     module5  = NA_character_,   # 05-groups
@@ -53,12 +53,12 @@ launch_graded_tutorial <- function(module = NULL) {
   # Folder names, for translating student input and for readable listings.
   folders <- c(
     module1  = "01-intro-to-r",
-    module2  = "02-posit-cloud",
+    module2  = "02-data-import",
     module3  = "03-refresher",
-    module4  = "04-data-wrangling",
+    module4  = "04-wrangle-visualize",
     module5  = "05-groups",
     module6  = "06-regression",
-    module7  = "07-2way-anova",
+    module7  = "07-two-way-anova",
     module8  = "08-ancova",
     module9  = "09-choosing-a-test",
     module10 = "10-joining-data"
