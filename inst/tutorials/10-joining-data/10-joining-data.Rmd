@@ -11,6 +11,22 @@ description: >
   and how left, inner, full, and right joins differ.
 ---
 
+```{css bx-style, echo=FALSE}
+/* Sidebar is a progress display, not navigation.                   */
+/* allow_skip: false gates the Continue button but NOT the sidebar, */
+/* so without this a student can click any topic and land there     */
+/* having completed nothing.                                        */
+/* Disabling the <li>, not the <a>: the <nav> is a shiny-bound-input */
+/* that delegates clicks, so an inert <a> just passes the click up.  */
+.topicsList .nav-pills .topic { pointer-events: none; }
+.topicsList .nav-pills .topic:not(.current) > .nav-link { opacity: 0.5; }
+
+/* Start Over sits in .topicsFooter, outside .nav-pills, so it stays */
+/* clickable. The Previous button is deliberately NOT hidden --      */
+/* with the sidebar inert it is the only way back to review.         */
+```
+
+
 ```{r setup, include=FALSE}
 library(learnr)
 library(shiny)
@@ -304,7 +320,7 @@ question(
   "What happens if `coords` were sorted in a DIFFERENT order than `sites`?",
   answer("Every site would get the wrong coordinates, with no warning.",
          correct = TRUE,
-         message = "Right — bind_cols() trusts row order blindly. When a shared key exists, a join is safer."),
+         message = "`bind_cols()` trusts row order blindly. When a shared key exists, a join is safer."),
   answer("R would automatically match them by site_id.",
          message = "No — bind_cols() ignores keys entirely. It only sees row position."),
   answer("R would throw an error.",
@@ -456,7 +472,7 @@ grade_this({
 question(
   "You have a `sites` table and a `surveys` table sharing `site_id`. You want ONE table with every site listed, plus its survey counts where they exist, and blanks where a site wasn't surveyed. Which tool?",
   answer("left_join(sites, surveys, by = \"site_id\")", correct = TRUE,
-         message = "Yes — you want all of the left table (sites) with survey data attached where available."),
+         message = "You want all of the left table (sites) with survey data attached where available."),
   answer("bind_rows(sites, surveys)",
          message = "bind_rows() stacks rows and needs matching columns; these tables have different columns and a shared key, so it's a join."),
   answer("inner_join(sites, surveys, by = \"site_id\")",
@@ -471,7 +487,7 @@ question(
 question(
   "You ran the same survey protocol in two years and each year's data is in its own table with identical columns. You want one long table for analysis. Which tool?",
   answer("bind_rows()", correct = TRUE,
-         message = "Right — same columns, you just want more rows. Add an .id column to remember which year."),
+         message = "Same columns, you just want more rows. Add an .id column to remember which year."),
   answer("full_join()",
          message = "A join matches on a key; here you simply want to stack identical-shaped tables."),
   answer("bind_cols()",

@@ -11,6 +11,22 @@ description: >
   and see what separates it from a two-way ANOVA.
 ---
 
+```{css bx-style, echo=FALSE}
+/* Sidebar is a progress display, not navigation.                   */
+/* allow_skip: false gates the Continue button but NOT the sidebar, */
+/* so without this a student can click any topic and land there     */
+/* having completed nothing.                                        */
+/* Disabling the <li>, not the <a>: the <nav> is a shiny-bound-input */
+/* that delegates clicks, so an inert <a> just passes the click up.  */
+.topicsList .nav-pills .topic { pointer-events: none; }
+.topicsList .nav-pills .topic:not(.current) > .nav-link { opacity: 0.5; }
+
+/* Start Over sits in .topicsFooter, outside .nav-pills, so it stays */
+/* clickable. The Previous button is deliberately NOT hidden --      */
+/* with the sidebar inert it is the only way back to review.         */
+```
+
+
 ```{r setup, include=FALSE}
 library(learnr)
 library(shiny)
@@ -257,7 +273,7 @@ quarter of the variation in resting heart rate. Real, but far from the whole sto
 ```{r review_check, echo=FALSE}
 question(
   "The slope is +0.46 with p < 0.001 and adjusted R^2^ = 0.23. Which reading is correct?",
-  answer("Each additional kilogram is associated with about 0.46 more bpm; the relationship is unlikely to be chance, but mass explains only about a quarter of the variation.", correct = TRUE, message = "Exactly — the slope and the R^2^ answer different questions, and you need both."),
+  answer("Each additional kilogram is associated with about 0.46 more bpm; the relationship is unlikely to be chance, but mass explains only about a quarter of the variation.", correct = TRUE, message = "The slope and the R^2^ answer different questions, and you need both."),
   answer("Heart rate rises by 46 bpm per kilogram.", message = "The slope is 0.46 bpm per kg, not 46. Watch the decimal — and sanity-check it against biology."),
   answer("Body mass explains almost all of the variation in heart rate.", message = "Adjusted R^2^ is 0.23 — about a quarter. A tiny p-value doesn't mean a large R^2^."),
   answer("Because p < 0.001, body mass causes the change in heart rate.", message = "Causation comes from the study design, not the p-value. This is observational data."),
@@ -446,7 +462,7 @@ The interaction model was a check, not the result.
 ```{r q3_interp, echo=FALSE}
 question(
   "Suppose the interaction had come back p = 0.002 instead. What would that mean?",
-  answer("Mass affects heart rate differently in the two sexes, so a single 'sex difference' can't be reported — the difference depends on body mass.", correct = TRUE, message = "Right. A significant interaction invalidates the additive ANCOVA; you'd describe each group's slope separately."),
+  answer("Mass affects heart rate differently in the two sexes, so a single 'sex difference' can't be reported — the difference depends on body mass.", correct = TRUE, message = "A significant interaction invalidates the additive ANCOVA; you'd describe each group's slope separately."),
   answer("The ANCOVA result is stronger.", message = "The opposite — a significant interaction means the additive model's group effect isn't interpretable."),
   answer("You should remove sex from the model.", message = "No — a significant interaction means sex matters *more* intricately, not less."),
   answer("Nothing changes; you'd report the additive model anyway.", message = "That's the trap. Reporting an additive group effect when slopes genuinely differ misrepresents the data."),

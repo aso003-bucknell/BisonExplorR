@@ -10,6 +10,22 @@ description: >
   and show both factors at once with a grouped boxplot and an interaction plot.
 ---
 
+```{css bx-style, echo=FALSE}
+/* Sidebar is a progress display, not navigation.                   */
+/* allow_skip: false gates the Continue button but NOT the sidebar, */
+/* so without this a student can click any topic and land there     */
+/* having completed nothing.                                        */
+/* Disabling the <li>, not the <a>: the <nav> is a shiny-bound-input */
+/* that delegates clicks, so an inert <a> just passes the click up.  */
+.topicsList .nav-pills .topic { pointer-events: none; }
+.topicsList .nav-pills .topic:not(.current) > .nav-link { opacity: 0.5; }
+
+/* Start Over sits in .topicsFooter, outside .nav-pills, so it stays */
+/* clickable. The Previous button is deliberately NOT hidden --      */
+/* with the sidebar inert it is the only way back to review.         */
+```
+
+
 ```{r setup, include=FALSE}
 library(learnr)
 library(shiny)

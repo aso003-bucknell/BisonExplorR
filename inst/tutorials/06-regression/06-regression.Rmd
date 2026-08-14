@@ -11,6 +11,22 @@ description: >
   p-value out of the summary, and say what each one means biologically.
 ---
 
+```{css bx-style, echo=FALSE}
+/* Sidebar is a progress display, not navigation.                   */
+/* allow_skip: false gates the Continue button but NOT the sidebar, */
+/* so without this a student can click any topic and land there     */
+/* having completed nothing.                                        */
+/* Disabling the <li>, not the <a>: the <nav> is a shiny-bound-input */
+/* that delegates clicks, so an inert <a> just passes the click up.  */
+.topicsList .nav-pills .topic { pointer-events: none; }
+.topicsList .nav-pills .topic:not(.current) > .nav-link { opacity: 0.5; }
+
+/* Start Over sits in .topicsFooter, outside .nav-pills, so it stays */
+/* clickable. The Previous button is deliberately NOT hidden --      */
+/* with the sidebar inert it is the only way back to review.         */
+```
+
+
 ```{r setup, include=FALSE}
 library(learnr)
 library(gradethis)
@@ -242,7 +258,7 @@ where each test is taught.
 ```{r pick_test, echo=FALSE}
 question(
   "You want to know whether light intensity predicts CO~2~ drawdown. Light was set to nine different values from 0 to 400 µmol. Which test?",
-  answer("Linear regression", correct = TRUE, message = "Right. Light is a measured number, not a label — so you want a slope, not a group difference."),
+  answer("Linear regression", correct = TRUE, message = "Light is a measured number, not a label — so you want a slope, not a group difference."),
   answer("One-way ANOVA with nine groups", message = "You could force it, but you would throw away the ordering. ANOVA treats 50 and 400 as two unrelated labels; regression uses the fact that 400 is eight times 50."),
   answer("t-test", message = "A t-test compares two groups. There are no groups here — light is continuous."),
   allow_retry = TRUE
@@ -368,7 +384,7 @@ Per-unit slopes are often awkwardly small. Scale them to something a reader can 
 ```{r slope_units, echo=FALSE}
 question(
   "The slope is 0.1218. What are its units?",
-  answer("ppm per µmol m^-2^ s^-1^", correct = TRUE, message = "Yes — response units over predictor units. Always state both."),
+  answer("ppm per µmol m^-2^ s^-1^", correct = TRUE, message = "Response units over predictor units. Always state both."),
   answer("ppm", message = "Not quite. A slope is a *rate*: how much y changes per unit of x. It needs both units."),
   answer("µmol m^-2^ s^-1^", message = "That's the predictor's units alone. A slope combines both."),
   answer("It has no units — it's a correlation", message = "That's r or R^2^, which are unitless. A regression slope is not."),
@@ -421,7 +437,7 @@ dark is a perfectly ordinary vial.
 ```{r intercept_meaning, echo=FALSE}
 question(
   "A classmate regresses leaf area on plant height across 40 seedlings and reports: 'The intercept is 3.1 cm^2^, so a plant of zero height has 3.1 cm^2^ of leaf.' What's wrong?",
-  answer("A plant of zero height doesn't exist, so the intercept has no biological meaning here — it's just where the fitted line happens to cross the axis.", correct = TRUE, message = "Exactly. The intercept is always mathematically defined; whether it *means* anything depends on whether zero is reachable."),
+  answer("A plant of zero height doesn't exist, so the intercept has no biological meaning here — it's just where the fitted line happens to cross the axis.", correct = TRUE, message = "The intercept is always mathematically defined; whether it *means* anything depends on whether zero is reachable."),
   answer("Nothing — that's the correct reading of an intercept.", message = "The arithmetic is right but the biology isn't. Zero height is not an achievable plant."),
   answer("The intercept should always be zero.", message = "No — there's no rule forcing an intercept through the origin, and forcing one usually distorts the fit."),
   answer("They should have used the slope instead.", message = "The slope is a different quantity. The issue is specifically whether zero is a meaningful predictor value."),
@@ -490,7 +506,7 @@ observed. Causation comes from the design, never from the model.
 ```{r pval_meaning, echo=FALSE}
 question(
   "The slope's p-value is 1.44e-15. Which statement is correct?",
-  answer("There is very strong evidence that the true slope is not zero.", correct = TRUE, message = "Right — that's precisely the claim being tested."),
+  answer("There is very strong evidence that the true slope is not zero.", correct = TRUE, message = "That's precisely the claim being tested."),
   answer("There is a 1.44e-15 probability that the results are due to chance.", message = "A common misreading. The p-value is the probability of data this extreme *if* the slope were truly zero — not the probability that chance is the explanation."),
   answer("The relationship is very strong.", message = "Strength is R^2^ (0.85 here). A p-value can be tiny for a weak relationship if the sample is large."),
   answer("85% of the variation is explained.", message = "That's the R^2^, a different number in the same output."),
@@ -564,7 +580,7 @@ numbers support the claim; they aren't the claim.
 ```{r reporting_check, echo=FALSE}
 question(
   "Which of these is missing from the report sentence above, if you were writing it for a lab report?",
-  answer("Nothing — direction, size, units, R^2^, test statistic, p, and n are all there.", correct = TRUE, message = "Correct. Use it as your template."),
+  answer("Nothing — direction, size, units, R^2^, test statistic, p, and n are all there.", correct = TRUE, message = "Use it as your template."),
   answer("The mean drawdown", message = "A mean isn't part of a regression report — the line replaces it."),
   answer("The standard error of every point", message = "Not needed; the residual error is already summarised by R^2^ and the F-test."),
   allow_retry = TRUE

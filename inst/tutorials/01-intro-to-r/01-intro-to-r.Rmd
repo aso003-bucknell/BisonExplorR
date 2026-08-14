@@ -4,10 +4,25 @@ output:
   learnr::tutorial:
     progressive: true
     allow_skip: false
-    css: custom.css
 runtime: shiny_prerendered
 description: "Get oriented in RStudio, create objects, identify data types, and explore the goldenrod-gall dataframe."
 ---
+
+```{css bx-style, echo=FALSE}
+/* Sidebar is a progress display, not navigation.                   */
+/* allow_skip: false gates the Continue button but NOT the sidebar, */
+/* so without this a student can click any topic and land there     */
+/* having completed nothing.                                        */
+/* Disabling the <li>, not the <a>: the <nav> is a shiny-bound-input */
+/* that delegates clicks, so an inert <a> just passes the click up.  */
+.topicsList .nav-pills .topic { pointer-events: none; }
+.topicsList .nav-pills .topic:not(.current) > .nav-link { opacity: 0.5; }
+
+/* Start Over sits in .topicsFooter, outside .nav-pills, so it stays */
+/* clickable. The Previous button is deliberately NOT hidden --      */
+/* with the sidebar inert it is the only way back to review.         */
+```
+
 
 ```{r setup, include=FALSE}
 library(learnr)
@@ -234,11 +249,65 @@ quiz(
   question("Where does R display a plot after you run plotting code?",
     answer("Source pane"),
     answer("Console pane"),
-    answer("Plots pane", correct = TRUE, message = "Correct — plots appear in the Plots pane."),
+    answer("Plots pane", correct = TRUE, message = "Plots appear in the Plots pane."),
     answer("Environment pane"),
     allow_retry = TRUE
   )
 )
+```
+
+------------------------------------------------------------------------
+
+## Typing Code and Writing Comments
+
+Everything you have seen so far, you have read. Now you will type.
+
+The boxes in this tutorial work like the Console in RStudio: you type R code,
+press **Run Code** to see what happens, and press **Submit Answer** when you
+want it recorded. You can run as many times as you like before submitting.
+
+### Comments
+
+R ignores any line that starts with `#`. These lines are called **comments**,
+and they are notes for humans — you, your lab partner, or you in three weeks
+when you have forgotten why you did something.
+
+```{r comment-demo, exercise=FALSE, echo=TRUE}
+# Count the stems in quadrat 3
+n_stems <- 42
+```
+
+R reads the second line and ignores the first entirely.
+
+**In this tutorial, comments are your instructions.** When you open an exercise
+and see a line beginning with `#`, that line is telling you what to write.
+Leave it there and type your code on the line below it.
+
+### Your turn
+
+The box below has a comment in it. Type a line underneath that creates an object
+called `n_quadrats` with the value `3`.
+
+```{r comment-exercise, exercise=TRUE}
+# Create an object called n_quadrats and set it to 3
+
+```
+
+```{r comment-exercise-check}
+grade_this({
+  pass_if(
+    user_object_exists("n_quadrats") &&
+      identical(user_object_get("n_quadrats"), 3),
+    "Correct — and notice the comment is still sitting there. R read straight past it."
+  )
+
+  fail_if(
+    !user_object_exists("n_quadrats"),
+    "No object called `n_quadrats` yet. Type `n_quadrats <- 3` on the line below the comment."
+  )
+
+  fail("`n_quadrats` exists but is not 3. Check the value you assigned.")
+})
 ```
 
 ------------------------------------------------------------------------
@@ -310,22 +379,22 @@ from it fails. This is the reason units belong in the header and never in the ce
 
 #### Try it: `class()`
 
-Run the code below to see the class of each example.
+The first line is written for you. Type the other two underneath it.
 
 ```{r class-demo, exercise=TRUE}
 class(3.14)
-class("hello")
-class(TRUE)
+# Now do the same for "hello" and for TRUE
+
 ```
 
 ```{r class-demo-check}
 grade_this({
   pass_if(
     identical(.result, "logical"),
-    "Correct — you ran the `class()` examples."
+    "Correct — three different types: numeric, character, logical."
   )
 
-  fail("Run the code as written to see the class of each example.")
+  fail("Add `class(\"hello\")` and `class(TRUE)` below the first line.")
 })
 ```
 
@@ -343,7 +412,7 @@ quiz(
   question('One student typed stem widths as "5.3 mm" instead of 5.3. What happens to that column in R?',
     answer("R strips the units automatically"),
     answer("R reads the whole column as character, so it cannot be averaged", correct = TRUE,
-           message = "Correct. One bad cell changes the type of the entire column, and nothing warns you."),
+           message = "One bad cell changes the type of the entire column, and nothing warns you."),
     answer("R reads it as numeric and ignores the letters"),
     answer("R refuses to import the file"),
     allow_retry = TRUE
@@ -366,20 +435,21 @@ your own field sheet was designed to produce.
 
 ### Confirm the data loaded
 
-Run the line below. You should see `"data.frame"`, which means `goldenrod` is stored as a dataframe.
+Type a line that checks what kind of object `goldenrod` is. You should see `"data.frame"`.
 
 ```{r confirm-load, exercise=TRUE}
-class(goldenrod)
+# Check what kind of object goldenrod is
+
 ```
 
 ```{r confirm-load-check}
 grade_this({
   pass_if(
     identical(.result, "data.frame"),
-    "Good — you ran the check."
+    "Good — `goldenrod` is a dataframe and it is loaded."
   )
 
-  fail("Run `class(goldenrod)` to check that the dataset is available.")
+  fail("Type `class(goldenrod)` below the comment.")
 })
 ```
 
@@ -465,7 +535,7 @@ quiz(
   question("A student counted inflorescence shoots on a stem and found none. What belongs in the `n_inflorescence_shoots` cell?",
     answer("Leave it blank"),
     answer("0", correct = TRUE,
-           message = "Correct. The measurement was taken and the answer was zero. That is data, and it must not become NA."),
+           message = "The measurement was taken and the answer was zero. That is data, and it must not become NA."),
     answer("NA"),
     answer("A dash"),
     allow_retry = TRUE
@@ -473,7 +543,7 @@ quiz(
   question("A stem snapped before it could be measured. What belongs in the cell?",
     answer("0"),
     answer("Leave it blank, and give the reason in a notes column", correct = TRUE,
-           message = "Correct. R reads a blank as NA, which is exactly right — and the notes column records why, so it can be recovered later."),
+           message = "R reads a blank as NA, which is exactly right — and the notes column records why, so it can be recovered later."),
     answer("The group average"),
     answer("A dash"),
     allow_retry = TRUE
@@ -489,10 +559,11 @@ quiz(
 
 #### Run `str(goldenrod)`
 
-Run `str(goldenrod)` once more, then answer the questions that follow.
+Type `str(goldenrod)` once more, then answer the questions that follow.
 
 ```{r str-review, exercise=TRUE}
-str(goldenrod)
+# Look at the structure of goldenrod
+
 ```
 
 ```{r str-review-check}
@@ -502,7 +573,7 @@ grade_this({
     "Correct — now use the output to answer the questions that follow."
   )
 
-  fail("Try again. Run `str(goldenrod)`.")
+  fail("Type `str(goldenrod)` below the comment.")
 })
 ```
 
@@ -514,26 +585,26 @@ quiz(
   question("Question 1: How many observations (rows) does the goldenrod dataset have?",
     answer("8"),
     answer("15", message = "15 is the number of pairs. Each pair contributes two stems, and one row is one stem."),
-    answer("30", correct = TRUE, message = "Correct! The top line indicates there are 30 observations — 15 pairs, two stems each."),
+    answer("30", correct = TRUE, message = "The top line indicates there are 30 observations — 15 pairs, two stems each."),
     answer("60"),
     allow_retry = TRUE
   ),
   question("Question 2: In your str(goldenrod) output, what data type is the gall_status variable?",
     answer("numeric"),
     answer("logical"),
-    answer("character", correct = TRUE, message = "Correct! It is listed as a character (chr) variable."),
+    answer("character", correct = TRUE, message = "It is listed as a character (chr) variable."),
     allow_retry = TRUE
   ),
   question("Question 3: What data type is stem_width_mm?",
     answer("character"),
     answer("logical"),
-    answer("numeric", correct = TRUE, message = "Correct! In str() output, numeric variables usually appear as 'num'."),
+    answer("numeric", correct = TRUE, message = "In str() output, numeric variables usually appear as 'num'."),
     allow_retry = TRUE
   ),
   question("Question 4: Why does the dataset need a pair_id column at all?",
     answer("To count how many stems were sampled"),
     answer("To record which galled stem was matched with which ungalled neighbor", correct = TRUE,
-           message = "Correct. Without pair_id the matching you did in the field is lost, and the wrong statistical test runs silently."),
+           message = "Without pair_id the matching you did in the field is lost, and the wrong statistical test runs silently."),
     answer("To sort the rows alphabetically"),
     answer("It is not needed; R can work it out"),
     allow_retry = TRUE
@@ -549,10 +620,11 @@ You can pull out a single column from a dataframe using the `$` operator.
 
 ### The `$` operator
 
-Run the line below to pull out the `gall_status` column.
+Type a line that pulls out the `gall_status` column using `$`.
 
 ```{r dollar-demo, exercise=TRUE}
-goldenrod$gall_status
+# Pull out the gall_status column using $
+
 ```
 
 ```{r dollar-demo-check}
@@ -562,11 +634,11 @@ grade_this({
     "Correct — `goldenrod$gall_status` pulls out the `gall_status` column. Every value reads either galled or ungalled, spelled identically. That is not luck."
   )
 
-  fail("Run `goldenrod$gall_status` to access the `gall_status` column.")
+  fail("Type `goldenrod$gall_status` below the comment.")
 })
 ```
 
-Every value in that column is either `galled` or `ungalled`, spelled and capitalised the
+Every value in that column is either `galled` or `ungalled`, spelled and capitalized the
 same way every time. If a few rows read `Galled` or `un-galled`, R would treat them as
 additional, separate groups — and a comparison of two groups would quietly become a
 comparison of four.
