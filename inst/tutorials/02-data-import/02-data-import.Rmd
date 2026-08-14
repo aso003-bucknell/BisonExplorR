@@ -116,6 +116,27 @@ event_register_handler("exercise_result", function(session, event, data) {
     correct     = data$feedback$correct
   )
 })
+
+# Multiple-choice items. Without this, question() blocks emit
+# question_submission, nothing logs them, and the three MC items in
+# grade_module()'s module2 lookup score nothing -- silently capping
+# every student at 5/8.
+#
+# NOTE: correctness is on data$correct here, NOT data$feedback$correct.
+# Copied from 05-groups.Rmd, whose comment records this field name was
+# never verified against the installed learnr and that a wrong guess
+# fails SILENTLY. Both are tried. VERIFY ON M2 BEFORE LAUNCH.
+event_register_handler("question_submission", function(session, event, data) {
+  correct_flag <- data$correct
+  if (is.null(correct_flag) || length(correct_flag) == 0) {
+    correct_flag <- data$feedback$correct
+  }
+  log_attempt(
+    student_id  = bx_get_sid(session),
+    exercise_id = data$label,
+    correct     = correct_flag
+  )
+})
 ```
 
 ## Welcome to Module 2
@@ -239,27 +260,17 @@ After you create your account, log in to Posit Cloud.
 
 ### Check your understanding
 
-Which Posit Cloud plan should you choose for this course?
-
-- a) Cloud Free
-- b) Cloud Basic
-- c) Instructor
-- d) Enterprise
-
-Type the letter of the correct answer in quotes, then click **Submit Answer**.
-
-```{r account-quiz, exercise=TRUE, exercise.lines=2}
-# Type the letter of your answer in quotes.
-```
-
-```{r account-quiz-check}
-grade_this({
-  if (is.character(.result) && length(.result) == 1 &&
-      identical(tolower(trimws(.result)), "a")) {
-    pass("Correct — the Cloud Free plan is all you need for this course.")
-  }
-  fail("Not quite. Choose the free plan (option a).")
-})
+```{r account-quiz, echo=FALSE}
+question(
+  "Which Posit Cloud plan should you choose for this course?",
+  answer("Cloud Free", correct = TRUE,
+         message = "The free plan is all you need for this course."),
+  answer("Cloud Basic"),
+  answer("Instructor"),
+  answer("Enterprise"),
+  allow_retry = TRUE,
+  random_answer_order = FALSE
+)
 ```
 
 ---
@@ -276,27 +287,17 @@ After you open the link, you should see a course space for your lab section, suc
 
 ### Check your understanding
 
-Why should you use the link for your assigned lab section?
-
-- a) It opens the correct course space for your section
-- b) It makes R run faster
-- c) It automatically writes your code for you
-- d) It replaces the need to save your work
-
-Type the letter of the correct answer in quotes.
-
-```{r section-link-quiz, exercise=TRUE, exercise.lines=2}
-# Type the letter of your answer in quotes.
-```
-
-```{r section-link-quiz-check}
-grade_this({
-  if (is.character(.result) && length(.result) == 1 &&
-      identical(tolower(trimws(.result)), "a")) {
-    pass("Correct — the section link gets you into the correct course space.")
-  }
-  fail("Not quite. The section link makes sure you are working in the correct course space.")
-})
+```{r section-link-quiz, echo=FALSE}
+question(
+  "Why should you use the link for your assigned lab section?",
+  answer("It opens the correct course space for your section", correct = TRUE,
+         message = "The section link gets you into the correct course space."),
+  answer("It makes R run faster"),
+  answer("It automatically writes your code for you"),
+  answer("It replaces the need to save your work"),
+  allow_retry = TRUE,
+  random_answer_order = FALSE
+)
 ```
 
 ---
@@ -313,27 +314,17 @@ This creates a new RStudio workspace where you can write code, upload files, and
 
 ### Check your understanding
 
-What should you create inside your lab section's Posit Cloud space?
-
-- a) A new email account
-- b) A new RStudio Project
-- c) A new browser window only
-- d) A new spreadsheet only
-
-Type the letter of the correct answer in quotes.
-
-```{r project-quiz, exercise=TRUE, exercise.lines=2}
-# Type the letter of your answer in quotes.
-```
-
-```{r project-quiz-check}
-grade_this({
-  if (is.character(.result) && length(.result) == 1 &&
-      identical(tolower(trimws(.result)), "b")) {
-    pass("Correct — create a new RStudio Project.")
-  }
-  fail("Not quite. In Posit Cloud, you need to create a new RStudio Project.")
-})
+```{r project-quiz, echo=FALSE}
+question(
+  "What should you create inside your lab section's Posit Cloud space?",
+  answer("A new RStudio Project", correct = TRUE,
+         message = "Create a new RStudio Project."),
+  answer("A new email account"),
+  answer("A new browser window only"),
+  answer("A new spreadsheet only"),
+  allow_retry = TRUE,
+  random_answer_order = FALSE
+)
 ```
 
 ---
