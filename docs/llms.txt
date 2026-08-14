@@ -54,13 +54,13 @@ for the full walkthrough.
 
 | Module | Tutorial               | Topic                                |
 |--------|------------------------|--------------------------------------|
-| 1      | `01-data-import`       | Introduction to R                    |
-| 2      | `02-posit-cloud`       | Posit Cloud and data import          |
+| 1      | `01-intro-to-r`        | Introduction to R                    |
+| 2      | `02-data-import`       | Data Import                          |
 | 3      | `03-refresher`         | Welcome back — R refresher           |
 | 4      | `04-wrangle-visualize` | Data wrangling and visualization     |
 | 5      | `05-groups`            | Comparing groups — t-tests and ANOVA |
 | 6      | `06-regression`        | Linear regression — fitting a line   |
-| 7      | `07-2way-anova`        | Two-way ANOVA                        |
+| 7      | `07-two-way-anova`     | Two-way ANOVA                        |
 | 8      | `08-ancova`            | ANCOVA, and multi-panel figures      |
 | 9      | `09-choosing-a-test`   | Choosing the right test              |
 | 10     | `10-joining-data`      | Joining data — combining tables      |

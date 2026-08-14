@@ -1,7 +1,7 @@
 import re, pathlib
 mods = {
- "module1":("01-data-import.Rmd",["assign-exercise","class-demo","confirm-load","head-exercise","str-exercise","summary-exercise","str-review","dollar-demo","dollar-exercise"]),
- "module2":("02-posit-cloud.Rmd",["account-quiz","section-link-quiz","project-quiz","import-practice","head-lab-data","str-lab-data","summary-lab-data","first-plot"]),
+ "module1":("01-intro-to-r.Rmd",["assign-exercise","class-demo","confirm-load","head-exercise","str-exercise","summary-exercise","str-review","dollar-demo","dollar-exercise"]),
+ "module2":("02-data-import.Rmd",["account-quiz","section-link-quiz","project-quiz","import-practice","head-lab-data","str-lab-data","summary-lab-data","first-plot"]),
  "module3":("03-refresher.Rmd",[f"q{i}" for i in (7,8)]),
  "module4":("04-wrangle-visualize.Rmd",[f"q{i}" for i in range(1,12)]),
  "module5":("05-groups.Rmd",[f"q{i}" for i in range(1,5)]+[f"mc{i}" for i in range(1,5)]),

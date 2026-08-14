@@ -1,7 +1,7 @@
 # For students
 
 This guide covers everything you need to do BIOL 204 R work: opening
-tutorials, getting lab scripts, and practising for exams. If you are new
+tutorials, getting lab scripts, and practicing for exams. If you are new
 to R, start at the top and read straight through — it takes about ten
 minutes.
 
@@ -81,7 +81,7 @@ person. If you use your Bucknell email in Module 3 and your ID number in
 Module 4, those look like two separate students, and neither one has
 completed both modules.
 
-If you realise partway through the semester that you have been
+If you realize partway through the semester that you have been
 inconsistent, tell your instructor — it can be fixed, but only if
 someone knows.
 
@@ -151,7 +151,7 @@ get_lab("comparing-groups", overwrite = TRUE)
 That **erases the work you have done in that file**, so only use it if
 you mean it.
 
-## Practising for exams
+## Practicing for exams
 
 Practice exams use different organisms and different numbers from the
 real thing, but the same structure, the same skills, and the same point
@@ -173,7 +173,7 @@ so your code reads them by plain filename:
 turtles <- read.csv("turtle_growth.csv")
 ```
 
-Practising the same way means the code you have rehearsed is the code
+Practicing the same way means the code you have rehearsed is the code
 that works under time pressure.
 
 ## Your code library
