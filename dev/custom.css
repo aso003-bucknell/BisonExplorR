@@ -1,8 +1,17 @@
 /* =====================================================================
-   BisonExplorR — shared tutorial stylesheet
-   SOURCE OF TRUTH: dev/custom.css
-   Copied into each inst/tutorials/<module>/ by dev/roll-out-css.R.
-   Edit here, never in a module folder, or the copies will drift.
+   BisonExplorR -- shared tutorial stylesheet
+
+   *** NOT LOADED AT RUNTIME. ***
+   `css: custom.css` in the YAML makes the browser request /custom.css
+   over HTTP; the Shiny app does not serve that path, returns an HTML
+   404, and the browser refuses it on MIME-type mismatch. The rules
+   below ship as an inlined ```{css bx-style} chunk in each of the ten
+   .Rmd files, written by dev/inline-css.R.
+
+   THIS FILE IS DOCUMENTATION. Editing it changes nothing. To change
+   what students see, edit the chunk in the .Rmd files (or edit the
+   block inside inline-css.R and re-run it), then update this file to
+   match. It drifted once already -- see the note on rule 1.
 
    Verified against learnr 0.11.6.9000 markup:
      <nav class="topicsList">
@@ -12,8 +21,8 @@
      <footer class="topicsFooter"><span class="resetButton">Start Over</span>
 
    NOTE: learnr marks only the CURRENT topic. There is no class
-   distinguishing visited from unvisited, which is why this disables all
-   sidebar links rather than only the ones ahead of the student.
+   distinguishing visited from unvisited, which is why this disables
+   all sidebar links rather than only the ones ahead of the student.
    ===================================================================== */
 
 /* ---------------------------------------------------------------------
@@ -21,24 +30,35 @@
 
    allow_skip: false gates the Continue button but NOT the sidebar --
    a student could click any topic and land there having completed
-   nothing. This closes that.
+   nothing. This closes the mouse route.
 
-   The <li class="topic"> keeps pointer events so :hover and the
-   current-topic highlight still render; only the <a> is inert.
+   CORRECTED 2026-08-15: this file previously disabled
+       .topicsList .nav-pills .topic > .nav-link
+   i.e. the anchor. That does not work. The <nav> is a
+   shiny-bound-input that DELEGATES clicks, so an inert <a> passes the
+   click up to a handler that fires anyway. The <li> is what must be
+   disabled. The shipped chunk has always done this; only this file
+   was wrong.
    --------------------------------------------------------------------- */
-.topicsList .nav-pills .topic > .nav-link {
+.topicsList .nav-pills .topic {
   pointer-events: none;
-  cursor: default;
 }
 
+/* Dimmed = locked. 0.7, NOT 0.5.
+   At opacity 0.5 the effective text color over the #F7F7F7 sidebar is
+   #959595, a contrast ratio of 2.80:1 -- below the 4.5:1 WCAG 2.1 AA
+   floor for normal text (1.4.3). 0.7 gives #6e6e6e = 4.76:1 and still
+   reads as clearly dimmed. Measured, not eyeballed. Do not lower. */
 .topicsList .nav-pills .topic:not(.current) > .nav-link {
-  opacity: 0.5;
+  opacity: 0.7;
 }
-
-
 
 /* Start Over lives in .topicsFooter, outside .nav-pills, so it is
    unaffected by the rule above. Left deliberately clickable. */
+
+/* learnr paints a topicProgress.png sprite as the <li> background. */
+/* With the sidebar inert it reads as clutter.                     */
+.topicsList .nav-pills .topic { background-image: none; }
 
 /* ---------------------------------------------------------------------
    2. Previous button: RESTORED (decision 2026-08-14).
@@ -56,6 +76,20 @@
    some other route backward.
    --------------------------------------------------------------------- */
 
-/* learnr paints a topicProgress.png sprite as the <li> background. */
-/* With the sidebar inert it reads as clutter.                     */
-.topicsList .nav-pills .topic { background-image: none; }
+/* ---------------------------------------------------------------------
+   3. KNOWN GAP -- not fixed here.
+
+   pointer-events:none removes the MOUSE route into a locked topic but
+   does NOT remove the <a> from the keyboard tab order. A keyboard user
+   can still Tab to a locked topic and press Enter, which fires the
+   delegated handler and bypasses the gate. Screen readers also
+   announce these as ordinary links with no indication they are locked.
+
+   Correct fix is tabindex="-1" plus aria-disabled="true" on the locked
+   anchors, which CSS cannot do -- it needs JS, alongside the existing
+   MutationObserver in the sid-server chunk.
+
+   Deferred pending Office of Accessibility Resources consultation
+   (contacted 2026-08-17), since the mitigation approach is the exact
+   question put to them.
+   --------------------------------------------------------------------- */

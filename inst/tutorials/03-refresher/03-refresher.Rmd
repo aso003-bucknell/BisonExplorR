@@ -22,7 +22,9 @@ editor_options:
 /* learnr paints a topicProgress.png sprite as the <li> background. */
 /* With the sidebar inert it reads as clutter.                     */
 .topicsList .nav-pills .topic { background-image: none; }
-.topicsList .nav-pills .topic:not(.current) > .nav-link { opacity: 0.5; }
+/* 0.7 not 0.5: at 0.5 the dimmed text is 2.80:1, below the 4.5:1  */
+/* WCAG AA floor. 0.7 measures 4.76:1 and still reads as dimmed.   */
+.topicsList .nav-pills .topic:not(.current) > .nav-link { opacity: 0.7; }
 
 /* Start Over sits in .topicsFooter, outside .nav-pills, so it stays */
 /* clickable. The Previous button is deliberately NOT hidden --      */
@@ -196,8 +198,6 @@ shiny::observeEvent(input$sid, {
 }, ignoreInit = TRUE)
 ```
 
-exercises you complete.
-
 It's been a few weeks, and that's plenty of time to forget where the
 parentheses go. **That's completely normal, and this tutorial is here to
 help.** There is *nothing new* in this module - it's a quick lap through
@@ -266,12 +266,28 @@ Create an object called `n_sites` and give it the value `15`. Then type
 
 ```{r review-assign-check}
 grade_this({
-  if (grepl("n_sites\\s*<-\\s*15", .user_code) &&
-      grepl("\\bn_sites\\b", .user_code)) {
-    pass("It comes back quickly — `<-` stores a value, and now n_sites holds 15.")
-  }
+  # State-based, matching M1 assign-exercise-check. Grades WHAT the
+  # student produced, not HOW they typed it, so `=` and `->` both pass.
+  # `=` was accepted as assignment on 2026-08-14; a text grep here
+  # silently reversed that decision for this one exercise.
+  pass_if(
+    user_object_exists("n_sites") &&
+      identical(user_object_get("n_sites"), 15),
+    "It comes back quickly - storing a value in an object works exactly as it did in the fall."
+  )
 
-  fail("Write:\n\nn_sites <- 15\nn_sites")
+  fail_if(
+    !user_object_exists("n_sites"),
+    "Try again. Create an object called `n_sites`."
+  )
+
+  fail_if(
+    user_object_exists("n_sites") &&
+      !identical(user_object_get("n_sites"), 15),
+    "Try again. `n_sites` exists, but it should hold the value 15."
+  )
+
+  fail("Assign the value 15 to an object called `n_sites`, then type `n_sites` on the next line to print it.")
 })
 ```
 
@@ -419,7 +435,7 @@ manual export step.
 
 Every Google Sheet URL contains a long ID between `/d/` and `/edit`:
 
-![](images/Sheet_ID.png){width="100%"}
+![A Google Sheets URL with the long ID between /d/ and /edit highlighted.](images/Sheet_ID.png){width="100%"}
 
 Swap everything after that ID for `/export?format=csv` and you get a
 link R can read directly:
@@ -480,12 +496,15 @@ csv_url <- paste0(
 
 ```{r q8-check}
 grade_this({
+  # NOTE: this previously used `.user_env`, which was not a gradethis
+  # object and never resolved -- every submission errored instead of
+  # being graded. Use the documented helpers (or .envir_result).
 
-  if (!exists("class_data", envir = .user_env)) {
+  if (!user_object_exists("class_data")) {
     fail("Create an object called class_data using read.csv(csv_url).")
   }
 
-  if (!is.data.frame(get("class_data", envir = .user_env))) {
+  if (!is.data.frame(user_object_get("class_data"))) {
     fail("class_data should be a data frame.")
   }
 

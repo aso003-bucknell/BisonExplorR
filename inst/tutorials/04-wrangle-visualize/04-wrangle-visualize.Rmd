@@ -19,7 +19,9 @@ description: "Reshape a dataset with dplyr and build figures with ggplot2, inclu
 /* learnr paints a topicProgress.png sprite as the <li> background. */
 /* With the sidebar inert it reads as clutter.                     */
 .topicsList .nav-pills .topic { background-image: none; }
-.topicsList .nav-pills .topic:not(.current) > .nav-link { opacity: 0.5; }
+/* 0.7 not 0.5: at 0.5 the dimmed text is 2.80:1, below the 4.5:1  */
+/* WCAG AA floor. 0.7 measures 4.76:1 and still reads as dimmed.   */
+.topicsList .nav-pills .topic:not(.current) > .nav-link { opacity: 0.7; }
 
 /* Start Over sits in .topicsFooter, outside .nav-pills, so it stays */
 /* clickable. The Previous button is deliberately NOT hidden --      */
