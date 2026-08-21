@@ -4,7 +4,6 @@ output:
   learnr::tutorial:
     progressive: true
     allow_skip: true
-    css: custom.css
 runtime: shiny_prerendered
 description: "A public, ungraded demonstration of a BisonExplorR module. Nothing is recorded."
 ---
